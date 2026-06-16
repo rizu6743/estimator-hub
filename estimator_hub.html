@@ -642,11 +642,11 @@ textarea { resize: vertical; min-height: 60px; }
   color: var(--text-dim);
 }
 .work-window-bar {
-  height: 14px;
+  height: 18px;
   background: var(--bg-input-soft);
   border-radius: 7px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   margin: 4px 0 4px;
 }
 .work-window-bar .elapsed-fill {
@@ -655,18 +655,44 @@ textarea { resize: vertical; min-height: 60px; }
   top: 0;
   bottom: 0;
   background: linear-gradient(90deg, var(--accent-2), rgba(6, 182, 212, 0.5));
-  opacity: 0.35;
+  opacity: 0.28;
+  border-radius: 7px;
   transition: width 0.4s;
 }
-.work-window-bar .focused-fill {
+.work-window-bar .pomo-segment {
   position: absolute;
-  left: 0;
   top: 0;
   bottom: 0;
   background: linear-gradient(90deg, var(--accent), #34d399);
-  border-radius: 7px;
-  transition: width 0.4s;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+  border-radius: 3px;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: opacity 0.3s;
+  cursor: help;
+  min-width: 3px;
+}
+.work-window-bar .pomo-segment:hover {
+  opacity: 0.8;
+  z-index: 3;
+}
+.pomo-timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.pomo-chip {
+  font-size: 10px;
+  background: var(--bg-input-soft);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: 5px;
+  padding: 3px 7px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .work-window-bar .now-marker {
   position: absolute;
@@ -7509,12 +7535,37 @@ function renderWorkHoursWidget(force = false) {
   const remainingMinutes = Math.max(0, totalMinutes - elapsedMinutes);
 
   // Focused minutes today (only counts completed focus pomos)
-  const focusedPomos = state.pomodoroSessions.filter(p => p.date === t && p.type === 'focus').length;
-  const focusedMinutes = focusedPomos * (state.settings.focusLength || 25);
+  const focusSessions = state.pomodoroSessions.filter(p => p.date === t && p.type === 'focus');
+  const focusedPomos = focusSessions.length;
+  const focusedMinutes = focusSessions.reduce((sum, p) => sum + (p.duration || state.settings.focusLength || 25), 0);
+
+  // Build individual pomodoro segments positioned by ACTUAL completion time
+  // Each segment: start = completedAt - duration, end = completedAt
+  const segments = [];
+  focusSessions.forEach(p => {
+    if (!p.completedAt) return;
+    const end = new Date(p.completedAt);
+    const dur = p.duration || state.settings.focusLength || 25;
+    const endMin = end.getHours() * 60 + end.getMinutes();
+    const startMin = endMin - dur;
+    // Clamp to work window
+    const segStart = Math.max(startMinutes, startMin);
+    const segEnd = Math.min(endMinutes, endMin);
+    if (segEnd <= segStart) return;
+    const leftPct = ((segStart - startMinutes) / totalMinutes) * 100;
+    const widthPct = ((segEnd - segStart) / totalMinutes) * 100;
+    segments.push({
+      leftPct,
+      widthPct,
+      startLabel: minutesToClockLabel(segStart),
+      endLabel: minutesToClockLabel(segEnd),
+      dur
+    });
+  });
+  segments.sort((a, b) => a.leftPct - b.leftPct);
 
   // Percentages
   const elapsedPct = (elapsedMinutes / totalMinutes) * 100;
-  const focusedPct = Math.min(100, (focusedMinutes / totalMinutes) * 100);
   const focusRate = elapsedMinutes > 0 ? Math.min(100, Math.round((focusedMinutes / elapsedMinutes) * 100)) : 0;
 
   // Status message
@@ -7541,6 +7592,13 @@ function renderWorkHoursWidget(force = false) {
     }
   }
 
+  // Build segment HTML — each pomodoro as its own block, with tooltip showing actual times
+  const segmentsHtml = segments.map((s, i) => `
+    <div class="pomo-segment" style="left:${s.leftPct}%;width:${s.widthPct}%;"
+         title="Pomodoro ${i + 1}: ${s.startLabel} → ${s.endLabel} (${s.dur} min)">
+    </div>
+  `).join('');
+
   el.innerHTML = `
     <div class="work-hours-card">
       <div class="work-hours-header">
@@ -7549,11 +7607,12 @@ function renderWorkHoursWidget(force = false) {
       </div>
       <div class="work-window-bar">
         <div class="elapsed-fill" style="width:${elapsedPct}%"></div>
-        <div class="focused-fill" style="width:${focusedPct}%"></div>
+        ${segmentsHtml}
         <div class="now-marker" style="left:${elapsedPct}%"></div>
       </div>
       <div class="work-hours-times">
         <span>${state.settings.workStart || '09:00'}</span>
+        ${focusedPomos > 0 ? `<span style="color:var(--accent);font-weight:600;">${focusedPomos} focus block${focusedPomos > 1 ? 's' : ''} · ${formatDuration(focusedMinutes)}</span>` : '<span style="color:var(--text-muted);">No focus blocks yet</span>'}
         <span>${state.settings.workEnd || '17:00'}</span>
       </div>
       <div class="work-hours-stats">
@@ -7578,8 +7637,26 @@ function renderWorkHoursWidget(force = false) {
           <div class="stat-sub">left to focus</div>
         </div>
       </div>
+      ${segments.length > 0 ? `
+      <div class="pomo-timeline-legend">
+        ${segments.map((s, i) => `<span class="pomo-chip" title="${s.startLabel} → ${s.endLabel}">🍅 ${s.startLabel}–${s.endLabel}</span>`).join('')}
+      </div>` : ''}
     </div>
   `;
+}
+
+// Convert minutes-from-midnight to a clock label respecting 12h/24h setting
+function minutesToClockLabel(mins) {
+  let h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const fmt = state.settings.clockFormat || '24h';
+  if (fmt === '12h') {
+    const ampm = h >= 12 ? 'pm' : 'am';
+    let h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+  }
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function goToTimezoneSettings() {
