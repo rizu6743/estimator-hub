@@ -2359,12 +2359,14 @@ table.ctask-table th {
           <option value="overdue">Overdue</option>
           <option value="completed">Completed</option>
           <option value="general">🗒 General Tasks</option>
+          <option value="templates">📋 Template Tasks</option>
           <option value="defaults">⭐ Default Tasks</option>
         </select>
         <select id="taskProjectFilter" style="width:auto;">
           <option value="all">All projects</option>
         </select>
         <button class="btn btn-primary" onclick="showGeneralTasksList()" title="Tasks not assigned to any project" id="generalListBtn">🗒 General Tasks <span id="generalListCount" style="margin-left:4px;font-size:11px;opacity:0.85;"></span></button>
+        <button class="btn btn-primary" onclick="showTemplateTasksList()" title="Reusable task library — add to any project on demand" id="templateListBtn">📋 Template Tasks <span id="templateListCount" style="margin-left:4px;font-size:11px;opacity:0.85;"></span></button>
         <button class="btn btn-primary" onclick="showDefaultTasksList()" title="View and manage default tasks (templates for new projects)" id="defaultsListBtn">⭐ Default Tasks <span id="defaultsListCount" style="margin-left:4px;font-size:11px;opacity:0.85;"></span></button>
         <button class="btn btn-primary" onclick="openTaskModal()">+ New Task</button>
       </div>
@@ -2932,10 +2934,111 @@ table.ctask-table th {
   </div>
 </div>
 
+<!-- ==================== TEMPLATE TASK MODAL ==================== -->
+<div class="modal-overlay" id="templateModal">
+  <div class="modal">
+    <h3 id="templateModalTitle">New Template Task</h3>
+    <div class="task-type-toggle">
+      <button type="button" class="task-type-btn active" id="tmplTypeRegularBtn" onclick="setTemplateType('regular')">
+        <div class="tt-icon">📝</div>
+        <div class="tt-label">Regular Task</div>
+        <div class="tt-sub">Simple task with subtasks</div>
+      </button>
+      <button type="button" class="task-type-btn" id="tmplTypeComplexBtn" onclick="setTemplateType('complex')">
+        <div class="tt-icon">📊</div>
+        <div class="tt-label">Complex Task</div>
+        <div class="tt-sub">Date span + tables</div>
+      </button>
+    </div>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="tmplTitle" placeholder="e.g., Prepare BOQ reconciliation">
+    </div>
+    <div class="grid grid-2">
+      <div class="form-group">
+        <label>Priority</label>
+        <select id="tmplPriority">
+          <option value="high">High</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Estimated Pomodoros</label>
+        <input type="number" id="tmplPomo" min="0" value="1">
+      </div>
+    </div>
+    <div id="tmplComplexGroup" style="display:none;">
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label>Span (days) <span style="font-size:11px;color:var(--text-muted);font-weight:400;">— default duration</span></label>
+          <input type="number" id="tmplSpanDays" min="1" value="5">
+        </div>
+        <div class="form-group">
+          <label>Start offset (days) <span style="font-size:11px;color:var(--text-muted);font-weight:400;">— from add date</span></label>
+          <input type="number" id="tmplStartOffset" min="0" value="0">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin:-6px 0 12px;">📊 When added, dates default to these — you can adjust them at add-time.</div>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="tmplNotes" placeholder="Standing context for this template task..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Subtasks (one per line)</label>
+      <textarea id="tmplSubtasks" placeholder="Compare Rev-0 vs current&#10;Document changes&#10;Update pricing"></textarea>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);background:var(--bg-input-soft);padding:8px 10px;border-radius:6px;margin-bottom:8px;">
+      📋 This goes into your reusable library. It is <strong>not</strong> auto-added to any project — you add it on demand. Tables (for complex templates) can be built after adding to a project.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeTemplateModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ADD TEMPLATE TO PROJECT MODAL ==================== -->
+<div class="modal-overlay" id="addTemplateModal">
+  <div class="modal" style="max-width:440px;">
+    <h3>Add Template to Project</h3>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;" id="addTemplateName"></div>
+    <div class="form-group">
+      <label>Destination project</label>
+      <select id="addTemplateProject"></select>
+    </div>
+    <div class="form-group" id="addTemplateDueRow">
+      <label>Due Date <span style="font-size:11px;color:var(--text-muted);font-weight:400;">— optional</span></label>
+      <input type="date" id="addTemplateDue">
+    </div>
+    <div id="addTemplateDateRow" style="display:none;">
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="addTemplateStart">
+        </div>
+        <div class="form-group">
+          <label>Completion Date</label>
+          <input type="date" id="addTemplateEnd">
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);background:var(--bg-input-soft);padding:8px 10px;border-radius:6px;margin-bottom:8px;">
+      💡 A fresh copy is created in the project — subtasks, tables, and notes are copied. Editing it later won't affect the template.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAddTemplateModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmAddTemplateToProject()">Add to Project</button>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== TASK CONTEXT MENU ==================== -->
 <div id="taskContextMenu" class="context-menu">
   <div class="context-menu-item" onclick="ctxDuplicateTask()"><span>📄</span> Duplicate task</div>
   <div class="context-menu-item" onclick="ctxEditTask()"><span>✎</span> Edit task</div>
+  <div class="context-menu-item" onclick="ctxSaveAsTemplate()"><span>📋</span> Save as template</div>
   <div class="context-menu-item" onclick="ctxMoveTask()"><span>↔</span> Move to project…</div>
   <div class="context-menu-divider"></div>
   <div class="context-menu-item danger" onclick="ctxDeleteTask()"><span>🗑</span> Delete task</div>
@@ -3140,6 +3243,7 @@ const DEFAULT_STATE = {
   projects: [],
   tasks: [],
   defaultTasks: [],     // template tasks auto-added to every NEW project
+  templateTasks: [],    // reusable task library — user manually adds to projects on demand
   pomodoroSessions: [],
   reviews: [],
   challenges: [],
@@ -3242,6 +3346,7 @@ function loadState() {
     if (!Array.isArray(parsed.challenges)) parsed.challenges = [];
     // Ensure defaultTasks array exists
     if (!Array.isArray(parsed.defaultTasks)) parsed.defaultTasks = [];
+    if (!Array.isArray(parsed.templateTasks)) parsed.templateTasks = [];
     // Ensure complex-task fields exist on all tasks
     if (Array.isArray(parsed.tasks)) {
       parsed.tasks.forEach(t => {
@@ -4756,6 +4861,13 @@ function ctxDuplicateTask() {
   toast('📄 Task duplicated');
 }
 
+function ctxSaveAsTemplate() {
+  const id = ctxMenuTaskId;
+  closeTaskContextMenu();
+  if (!id) return;
+  saveTaskAsTemplate(id);
+}
+
 function ctxMoveTask() {
   const id = ctxMenuTaskId;
   closeTaskContextMenu();
@@ -5944,6 +6056,11 @@ function renderTasks() {
     renderDefaultTasksView(document.getElementById('allTaskList'));
     return;
   }
+  // SPECIAL MODE: Template Tasks library
+  if (filter === 'templates') {
+    renderTemplateTasksView(document.getElementById('allTaskList'));
+    return;
+  }
 
   let tasks = [...state.tasks];
   if (filter === 'today') tasks = tasks.filter(x => x.scheduledDate === t);
@@ -6508,6 +6625,311 @@ function setProjectFilter(filter) {
    ==================================================================== */
 let editingDefaultTaskId = null;
 
+/* ====================================================================
+   TEMPLATE TASKS — reusable library, added to projects on demand
+   Template shape: { id, title, taskType, priority, estimatedPomodoros, notes,
+                     subtasks:[strings], tables:[...], startOffsetDays, spanDays, createdAt }
+   ==================================================================== */
+let editingTemplateId = null;
+
+function renderTemplateTasksView(grid) {
+  const temps = state.templateTasks || [];
+  let html = `
+    <div style="grid-column:1/-1;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h3 style="margin:0 0 4px 0;font-size:16px;">📋 Template Tasks — Reusable Library</h3>
+          <div style="font-size:12px;color:var(--text-dim);line-height:1.5;">Save tasks you reuse often. Unlike Default Tasks, these are <strong>not</strong> auto-added anywhere — you pick when to add one to a project. Can be regular or complex tasks.</div>
+        </div>
+        <button class="btn btn-primary btn-small" onclick="openTemplateModal()">+ Add Template</button>
+      </div>
+  `;
+  if (temps.length === 0) {
+    html += `<div class="empty" style="padding:30px 14px;">
+      <div class="icon">📋</div>
+      <div style="font-size:14px;font-weight:500;margin-bottom:4px;">No template tasks yet</div>
+      <div style="font-size:12px;color:var(--text-muted);max-width:520px;margin:0 auto;line-height:1.5;">Build a library of tasks you reuse across tenders — e.g. "Prepare BOQ reconciliation", "Site measurement survey", "Adjudication meeting prep". Add them to any project whenever you need, with one click.</div>
+    </div>`;
+  } else {
+    html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+    temps.forEach((d, i) => {
+      const subCount = (d.subtasks || []).length;
+      const tableCount = (d.tables || []).length;
+      const isComplex = d.taskType === 'complex';
+      html += `
+        <div style="background:var(--bg-input-soft);border:1px solid var(--border);border-left:3px solid ${isComplex ? '#a855f7' : 'var(--accent-2)'};border-radius:8px;padding:10px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:240px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="font-size:11px;color:var(--text-muted);font-weight:600;">#${i + 1}</span>
+                <strong style="font-size:14px;">${escapeHtml(d.title)}</strong>
+                <span class="pill pill-${d.priority || 'medium'}" style="font-size:10px;">${d.priority || 'medium'}</span>
+                ${isComplex ? `<span style="font-size:10px;background:rgba(168,85,247,0.14);color:#a855f7;padding:2px 7px;border-radius:10px;font-weight:600;">📊 Complex</span>` : `<span style="font-size:10px;background:rgba(34,211,238,0.12);color:var(--accent-2);padding:2px 7px;border-radius:10px;font-weight:600;">📝 Regular</span>`}
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;">
+                <span>🍅 ${d.estimatedPomodoros || 1} pomos</span>
+                ${subCount > 0 ? `<span>☑ ${subCount} subtask${subCount > 1 ? 's' : ''}</span>` : ''}
+                ${tableCount > 0 ? `<span style="color:#a855f7;">▦ ${tableCount} table${tableCount > 1 ? 's' : ''}</span>` : ''}
+                ${isComplex && d.spanDays ? `<span style="color:#a855f7;">📊 ${d.spanDays}-day span</span>` : ''}
+                ${d.notes ? `<span title="${escapeHtml(d.notes)}">📝 has notes</span>` : ''}
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-icon btn-secondary" onclick="openAddTemplateToProject('${d.id}')" title="Add to a project" style="color:var(--accent);">➕</button>
+              <button class="btn btn-icon btn-secondary" onclick="openTemplateModal('${d.id}')" title="Edit template">✎</button>
+              <button class="btn btn-icon btn-secondary" onclick="moveTemplate('${d.id}', -1)" title="Move up">↑</button>
+              <button class="btn btn-icon btn-secondary" onclick="moveTemplate('${d.id}', 1)" title="Move down">↓</button>
+              <button class="btn btn-icon btn-danger" onclick="deleteTemplate('${d.id}')" title="Delete template">×</button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+    html += `
+      <div style="margin-top:14px;padding:10px 12px;background:rgba(34,211,238,0.06);border-left:3px solid var(--accent-2);border-radius:6px;font-size:12px;color:var(--text-dim);line-height:1.6;">
+        ➕ Click the green plus on any template to add it to a project of your choice.<br>
+        🛡 Templates are never auto-added — you stay in full control.
+      </div>
+    `;
+  }
+  html += `</div>`;
+  grid.innerHTML = html;
+}
+
+function openTemplateModal(id = null) {
+  editingTemplateId = id;
+  if (id) {
+    const d = state.templateTasks.find(x => x.id === id);
+    if (!d) return;
+    document.getElementById('templateModalTitle').textContent = 'Edit Template Task';
+    document.getElementById('tmplTitle').value = d.title;
+    document.getElementById('tmplPriority').value = d.priority || 'medium';
+    document.getElementById('tmplPomo').value = d.estimatedPomodoros || 1;
+    document.getElementById('tmplNotes').value = d.notes || '';
+    document.getElementById('tmplSubtasks').value = (d.subtasks || []).join('\n');
+    setTemplateType(d.taskType === 'complex' ? 'complex' : 'regular');
+    document.getElementById('tmplSpanDays').value = d.spanDays || 5;
+    document.getElementById('tmplStartOffset').value = d.startOffsetDays || 0;
+  } else {
+    document.getElementById('templateModalTitle').textContent = 'New Template Task';
+    document.getElementById('tmplTitle').value = '';
+    document.getElementById('tmplPriority').value = 'medium';
+    document.getElementById('tmplPomo').value = 1;
+    document.getElementById('tmplNotes').value = '';
+    document.getElementById('tmplSubtasks').value = '';
+    setTemplateType('regular');
+    document.getElementById('tmplSpanDays').value = 5;
+    document.getElementById('tmplStartOffset').value = 0;
+  }
+  document.getElementById('templateModal').classList.add('open');
+  setTimeout(() => document.getElementById('tmplTitle').focus(), 100);
+}
+
+let currentTemplateType = 'regular';
+function setTemplateType(type) {
+  currentTemplateType = type;
+  document.getElementById('tmplTypeRegularBtn').classList.toggle('active', type === 'regular');
+  document.getElementById('tmplTypeComplexBtn').classList.toggle('active', type === 'complex');
+  document.getElementById('tmplComplexGroup').style.display = type === 'complex' ? '' : 'none';
+}
+
+function closeTemplateModal() {
+  document.getElementById('templateModal').classList.remove('open');
+  editingTemplateId = null;
+}
+
+function saveTemplate() {
+  const title = document.getElementById('tmplTitle').value.trim();
+  if (!title) return toast('⚠ Title required');
+  const isComplex = currentTemplateType === 'complex';
+  const data = {
+    title,
+    taskType: isComplex ? 'complex' : 'regular',
+    priority: document.getElementById('tmplPriority').value,
+    estimatedPomodoros: parseInt(document.getElementById('tmplPomo').value) || 1,
+    notes: document.getElementById('tmplNotes').value,
+    subtasks: document.getElementById('tmplSubtasks').value.split('\n').map(s => s.trim()).filter(Boolean),
+    spanDays: isComplex ? (parseInt(document.getElementById('tmplSpanDays').value) || 5) : null,
+    startOffsetDays: isComplex ? (parseInt(document.getElementById('tmplStartOffset').value) || 0) : null
+  };
+  if (editingTemplateId) {
+    const d = state.templateTasks.find(x => x.id === editingTemplateId);
+    // preserve existing tables
+    data.tables = d.tables || [];
+    Object.assign(d, data);
+  } else {
+    state.templateTasks.push({ id: uid(), ...data, tables: [], createdAt: new Date().toISOString() });
+  }
+  saveState();
+  closeTemplateModal();
+  refreshDefaultsViewIfActive();
+  toast(editingTemplateId ? '✓ Template updated' : '✓ Template task added');
+}
+
+function deleteTemplate(id) {
+  const d = state.templateTasks.find(x => x.id === id);
+  if (!d) return;
+  customConfirm(`Delete the template "${d.title}"? Tasks already added to projects from it stay untouched.`, 'Delete template', 'Delete template').then(ok => {
+    if (!ok) return;
+    state.templateTasks = state.templateTasks.filter(x => x.id !== id);
+    saveState();
+    refreshDefaultsViewIfActive();
+    toast('🗑 Template removed');
+  });
+}
+
+function moveTemplate(id, direction) {
+  const idx = state.templateTasks.findIndex(d => d.id === id);
+  if (idx < 0) return;
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= state.templateTasks.length) return;
+  const [item] = state.templateTasks.splice(idx, 1);
+  state.templateTasks.splice(newIdx, 0, item);
+  saveState();
+  refreshDefaultsViewIfActive();
+}
+
+// Save an existing task as a template
+function saveTaskAsTemplate(taskId) {
+  const src = state.tasks.find(t => t.id === taskId);
+  if (!src) return;
+  let spanDays = null, startOffsetDays = null;
+  if (src.taskType === 'complex' && src.startDate && src.endDate) {
+    spanDays = Math.round((new Date(src.endDate) - new Date(src.startDate)) / 86400000) + 1;
+    startOffsetDays = 0;
+  }
+  // Deep-clone tables with fresh IDs
+  const tables = (src.tables || []).map(tb => {
+    const cm = {};
+    const cols = (tb.columns || []).map(c => { const n = uid(); cm[c.id] = n; return { id: n, name: c.name, type: c.type }; });
+    const rows = (tb.rows || []).map(r => {
+      const cells = {};
+      Object.keys(r.cells || {}).forEach(o => { if (cm[o]) cells[cm[o]] = r.cells[o]; });
+      return { id: uid(), cells };
+    });
+    return { id: uid(), name: tb.name, columns: cols, rows };
+  });
+  state.templateTasks.push({
+    id: uid(),
+    title: src.title,
+    taskType: src.taskType === 'complex' ? 'complex' : 'regular',
+    priority: src.priority || 'medium',
+    estimatedPomodoros: src.estimatedPomodoros || 1,
+    notes: src.notes || '',
+    subtasks: (src.subtasks || []).map(s => s.title),
+    tables,
+    spanDays,
+    startOffsetDays,
+    createdAt: new Date().toISOString()
+  });
+  saveState();
+  refreshDefaultsViewIfActive();
+  toast('📋 Saved to Template Tasks library');
+}
+
+/* Add-template-to-project modal */
+let addTemplateId = null;
+function openAddTemplateToProject(templateId) {
+  const d = state.templateTasks.find(t => t.id === templateId);
+  if (!d) return;
+  addTemplateId = templateId;
+  document.getElementById('addTemplateName').textContent = `"${d.title}"`;
+  const sel = document.getElementById('addTemplateProject');
+  const activeProjs = state.projects.filter(isProjectActive);
+  sel.innerHTML = '<option value="">🗒 General (no project)</option>' +
+    activeProjs.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  // Show/hide date fields based on type
+  document.getElementById('addTemplateDateRow').style.display = d.taskType === 'complex' ? '' : 'none';
+  document.getElementById('addTemplateDueRow').style.display = d.taskType === 'complex' ? 'none' : '';
+  // Prefill dates
+  const tdy = today();
+  if (d.taskType === 'complex') {
+    const start = new Date(); start.setDate(start.getDate() + (d.startOffsetDays || 0));
+    const end = new Date(start); end.setDate(end.getDate() + ((d.spanDays || 1) - 1));
+    document.getElementById('addTemplateStart').value = toLocalDateStr(start);
+    document.getElementById('addTemplateEnd').value = toLocalDateStr(end);
+  } else {
+    document.getElementById('addTemplateDue').value = '';
+  }
+  document.getElementById('addTemplateModal').classList.add('open');
+}
+
+function closeAddTemplateModal() {
+  document.getElementById('addTemplateModal').classList.remove('open');
+  addTemplateId = null;
+}
+
+function confirmAddTemplateToProject() {
+  if (!addTemplateId) return;
+  const d = state.templateTasks.find(t => t.id === addTemplateId);
+  if (!d) return;
+  const projectId = document.getElementById('addTemplateProject').value || null;
+  const isComplex = d.taskType === 'complex';
+  let startDate = null, endDate = null, dueDate = null, scheduled = today();
+
+  if (isComplex) {
+    startDate = document.getElementById('addTemplateStart').value || today();
+    endDate = document.getElementById('addTemplateEnd').value || startDate;
+    if (endDate < startDate) return toast('⚠ Completion date is before start date');
+    dueDate = endDate;
+    scheduled = startDate;
+  } else {
+    dueDate = document.getElementById('addTemplateDue').value || null;
+    scheduled = dueDate || today();
+  }
+  // Cap to project deadline
+  const proj = projectId ? state.projects.find(p => p.id === projectId) : null;
+  if (proj && proj.deadline) {
+    if (dueDate && dueDate > proj.deadline) { dueDate = proj.deadline; if (isComplex) endDate = proj.deadline; }
+  }
+  // Clone tables fresh
+  const tables = (d.tables || []).map(tb => {
+    const cm = {};
+    const cols = (tb.columns || []).map(c => { const n = uid(); cm[c.id] = n; return { id: n, name: c.name, type: c.type }; });
+    const rows = (tb.rows || []).map(r => {
+      const cells = {};
+      Object.keys(r.cells || {}).forEach(o => { if (cm[o]) cells[cm[o]] = r.cells[o]; });
+      return { id: uid(), cells };
+    });
+    return { id: uid(), name: tb.name, columns: cols, rows };
+  });
+  state.tasks.push({
+    id: uid(),
+    title: d.title,
+    projectId,
+    priority: d.priority || 'medium',
+    estimatedPomodoros: d.estimatedPomodoros || 1,
+    completedPomodoros: 0,
+    scheduledDate: scheduled,
+    dueDate,
+    taskType: isComplex ? 'complex' : 'regular',
+    startDate,
+    endDate,
+    tables,
+    notes: d.notes || '',
+    subtasks: (d.subtasks || []).map(line => ({ id: uid(), title: line, done: false })),
+    qualifications: [],
+    timeBoxes: [],
+    manualOrder: null,
+    rank: '',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    rolledOver: false,
+    rolloverCount: 0,
+    fromTemplate: true
+  });
+  saveState();
+  closeAddTemplateModal();
+  renderDashboard();
+  renderTasks();
+  renderSidebarProjects();
+  if (currentProjectId && document.getElementById('view-project-detail').classList.contains('active')) renderProjectView();
+  const dest = projectId ? (proj ? proj.name : 'project') : 'General';
+  toast(`✓ Added "${d.title}" to ${dest}`);
+}
+
 function renderDefaultTasksView(grid) {
   const defs = state.defaultTasks || [];
   let html = `
@@ -6614,6 +7036,28 @@ function refreshDefaultsViewIfActive() {
     const gcount = state.tasks.filter(t => !t.projectId && t.status !== 'completed').length;
     gbadge.textContent = gcount > 0 ? `(${gcount})` : '';
   }
+  const tbadge = document.getElementById('templateListCount');
+  if (tbadge) {
+    const tcount = (state.templateTasks || []).length;
+    tbadge.textContent = tcount > 0 ? `(${tcount})` : '';
+  }
+  // Refresh template view if active
+  if (document.getElementById('view-tasks').classList.contains('active') && document.getElementById('taskFilter').value === 'templates') {
+    renderTemplateTasksView(document.getElementById('allTaskList'));
+  }
+}
+
+// Switch Tasks view to the Template library and scroll to top
+function showTemplateTasksList() {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelector('.nav-item[data-view="tasks"]').classList.add('active');
+  document.getElementById('view-tasks').classList.add('active');
+  const filter = document.getElementById('taskFilter');
+  if (filter) filter.value = 'templates';
+  renderTasks();
+  const main = document.querySelector('.main');
+  if (main) main.scrollTop = 0;
 }
 
 // Switch Tasks view to the Defaults panel and scroll to it
