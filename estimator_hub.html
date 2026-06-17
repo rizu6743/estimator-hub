@@ -4923,7 +4923,9 @@ function confirmMoveTask() {
    Data model: task.tables = [{ id, name, columns:[{id,name,type}], rows:[{id, cells:{colId:value}}] }]
    Column types: text | richtext | number | check
    ==================================================================== */
-function findTaskById(id) { return state.tasks.find(t => t.id === id); }
+function findTaskById(id) {
+  return state.tasks.find(t => t.id === id) || (state.templateTasks || []).find(t => t.id === id);
+}
 
 function renderTaskTables(task) {
   const tables = task.tables || [];
@@ -5038,10 +5040,12 @@ function refreshTaskTablesUI(taskId) {
     return;
   }
   containers.forEach(c => { c.innerHTML = html; });
-  // Also update the table-count label in the section headers
-  document.querySelectorAll(`.task-item[data-task-id="${taskId}"]`).forEach(item => {
+  // Also update the table-count label in the section headers (tasks AND templates)
+  document.querySelectorAll(`.task-item[data-task-id="${taskId}"], .template-row[data-template-id="${taskId}"]`).forEach(item => {
     const lbl = item.querySelector('.tables-count-label');
     if (lbl) lbl.textContent = (task.tables || []).length > 0 ? `(${task.tables.length})` : '';
+    const tblCount = item.querySelector('.tmpl-table-count');
+    if (tblCount) { const tc = (task.tables || []).length; tblCount.textContent = tc > 0 ? `▦ ${tc} table${tc > 1 ? 's' : ''}` : ''; }
   });
 }
 
@@ -6631,6 +6635,16 @@ let editingDefaultTaskId = null;
                      subtasks:[strings], tables:[...], startOffsetDays, spanDays, createdAt }
    ==================================================================== */
 let editingTemplateId = null;
+let openTemplateDetails = new Set();
+
+// Normalize template subtasks to objects {id,title,done} (older templates stored strings)
+function normTemplateSubtasks(d) {
+  if (!Array.isArray(d.subtasks)) { d.subtasks = []; return; }
+  d.subtasks = d.subtasks.map(s => {
+    if (typeof s === 'string') return { id: uid(), title: s, done: false };
+    return s;
+  });
+}
 
 function renderTemplateTasksView(grid) {
   const temps = state.templateTasks || [];
@@ -6639,7 +6653,7 @@ function renderTemplateTasksView(grid) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
         <div>
           <h3 style="margin:0 0 4px 0;font-size:16px;">📋 Template Tasks — Reusable Library</h3>
-          <div style="font-size:12px;color:var(--text-dim);line-height:1.5;">Save tasks you reuse often. Unlike Default Tasks, these are <strong>not</strong> auto-added anywhere — you pick when to add one to a project. Can be regular or complex tasks.</div>
+          <div style="font-size:12px;color:var(--text-dim);line-height:1.5;">A complete package. Click any template to build it out — subtasks, tables, notes — then add it to any project later. Unlike Default Tasks, these are <strong>not</strong> auto-added anywhere.</div>
         </div>
         <button class="btn btn-primary btn-small" onclick="openTemplateModal()">+ Add Template</button>
       </div>
@@ -6648,19 +6662,23 @@ function renderTemplateTasksView(grid) {
     html += `<div class="empty" style="padding:30px 14px;">
       <div class="icon">📋</div>
       <div style="font-size:14px;font-weight:500;margin-bottom:4px;">No template tasks yet</div>
-      <div style="font-size:12px;color:var(--text-muted);max-width:520px;margin:0 auto;line-height:1.5;">Build a library of tasks you reuse across tenders — e.g. "Prepare BOQ reconciliation", "Site measurement survey", "Adjudication meeting prep". Add them to any project whenever you need, with one click.</div>
+      <div style="font-size:12px;color:var(--text-muted);max-width:520px;margin:0 auto;line-height:1.5;">Build a library of tasks you reuse across tenders — e.g. "Prepare BOQ reconciliation", "Site measurement survey". Click a template after creating it to add subtasks, tables, and notes.</div>
     </div>`;
   } else {
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     temps.forEach((d, i) => {
+      normTemplateSubtasks(d);
+      if (!Array.isArray(d.tables)) d.tables = [];
       const subCount = (d.subtasks || []).length;
       const tableCount = (d.tables || []).length;
       const isComplex = d.taskType === 'complex';
+      const isOpen = openTemplateDetails.has(d.id);
       html += `
-        <div style="background:var(--bg-input-soft);border:1px solid var(--border);border-left:3px solid ${isComplex ? '#a855f7' : 'var(--accent-2)'};border-radius:8px;padding:10px 14px;">
+        <div class="template-row" data-template-id="${d.id}" style="background:var(--bg-input-soft);border:1px solid var(--border);border-left:3px solid ${isComplex ? '#a855f7' : 'var(--accent-2)'};border-radius:8px;padding:10px 14px;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:240px;">
+            <div style="flex:1;min-width:240px;cursor:pointer;" onclick="toggleTemplateDetail('${d.id}')" title="Click to expand / collapse">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span class="task-expand-chevron ${isOpen ? 'open' : ''}">▸</span>
                 <span style="font-size:11px;color:var(--text-muted);font-weight:600;">#${i + 1}</span>
                 <strong style="font-size:14px;">${escapeHtml(d.title)}</strong>
                 <span class="pill pill-${d.priority || 'medium'}" style="font-size:10px;">${d.priority || 'medium'}</span>
@@ -6668,19 +6686,21 @@ function renderTemplateTasksView(grid) {
               </div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;">
                 <span>🍅 ${d.estimatedPomodoros || 1} pomos</span>
-                ${subCount > 0 ? `<span>☑ ${subCount} subtask${subCount > 1 ? 's' : ''}</span>` : ''}
-                ${tableCount > 0 ? `<span style="color:#a855f7;">▦ ${tableCount} table${tableCount > 1 ? 's' : ''}</span>` : ''}
+                <span class="tmpl-sub-count">${subCount > 0 ? `☑ ${subCount} subtask${subCount > 1 ? 's' : ''}` : ''}</span>
+                <span class="tmpl-table-count" style="color:#a855f7;">${tableCount > 0 ? `▦ ${tableCount} table${tableCount > 1 ? 's' : ''}` : ''}</span>
                 ${isComplex && d.spanDays ? `<span style="color:#a855f7;">📊 ${d.spanDays}-day span</span>` : ''}
-                ${d.notes ? `<span title="${escapeHtml(d.notes)}">📝 has notes</span>` : ''}
               </div>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-icon btn-secondary" onclick="openAddTemplateToProject('${d.id}')" title="Add to a project" style="color:var(--accent);">➕</button>
-              <button class="btn btn-icon btn-secondary" onclick="openTemplateModal('${d.id}')" title="Edit template">✎</button>
-              <button class="btn btn-icon btn-secondary" onclick="moveTemplate('${d.id}', -1)" title="Move up">↑</button>
-              <button class="btn btn-icon btn-secondary" onclick="moveTemplate('${d.id}', 1)" title="Move down">↓</button>
-              <button class="btn btn-icon btn-danger" onclick="deleteTemplate('${d.id}')" title="Delete template">×</button>
+              <button class="btn btn-icon btn-secondary" onclick="event.stopPropagation();openAddTemplateToProject('${d.id}')" title="Add to a project" style="color:var(--accent);">➕</button>
+              <button class="btn btn-icon btn-secondary" onclick="event.stopPropagation();openTemplateModal('${d.id}')" title="Edit title / priority / type">✎</button>
+              <button class="btn btn-icon btn-secondary" onclick="event.stopPropagation();moveTemplate('${d.id}', -1)" title="Move up">↑</button>
+              <button class="btn btn-icon btn-secondary" onclick="event.stopPropagation();moveTemplate('${d.id}', 1)" title="Move down">↓</button>
+              <button class="btn btn-icon btn-danger" onclick="event.stopPropagation();deleteTemplate('${d.id}')" title="Delete template">×</button>
             </div>
+          </div>
+          <div class="template-detail ${isOpen ? 'open' : ''}" style="${isOpen ? '' : 'display:none;'}margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            ${renderTemplateDetail(d)}
           </div>
         </div>
       `;
@@ -6688,13 +6708,134 @@ function renderTemplateTasksView(grid) {
     html += `</div>`;
     html += `
       <div style="margin-top:14px;padding:10px 12px;background:rgba(34,211,238,0.06);border-left:3px solid var(--accent-2);border-radius:6px;font-size:12px;color:var(--text-dim);line-height:1.6;">
-        ➕ Click the green plus on any template to add it to a project of your choice.<br>
-        🛡 Templates are never auto-added — you stay in full control.
+        💡 Click a template to expand it and add subtasks, tables, and notes.<br>
+        ➕ Use the green plus to add a fully-built template to a project of your choice.
       </div>
     `;
   }
   html += `</div>`;
   grid.innerHTML = html;
+}
+
+function renderTemplateDetail(d) {
+  normTemplateSubtasks(d);
+  if (!Array.isArray(d.tables)) d.tables = [];
+  let html = '';
+  // NOTES
+  html += `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">📝 Notes</div>
+      <textarea id="tmplNotesInline_${d.id}" placeholder="Standing context for this template..." style="font-size:12px;min-height:50px;width:100%;" onchange="setTemplateNotes('${d.id}',this.value)">${escapeHtml(d.notes || '')}</textarea>
+    </div>
+  `;
+  // SUBTASKS
+  html += `<div style="margin-bottom:12px;">
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">☑ Subtasks (${(d.subtasks||[]).filter(s=>s.done).length}/${(d.subtasks||[]).length})</div>`;
+  if ((d.subtasks || []).length > 0) {
+    html += `<div class="subtask-list">`;
+    html += d.subtasks.map(s => `
+      <div class="subtask-item">
+        <div class="subtask-check ${s.done ? 'checked' : ''}" onclick="toggleTemplateSubtask('${d.id}','${s.id}')"></div>
+        <span style="flex:1;${s.done ? 'text-decoration:line-through;color:var(--text-muted);' : ''}">${escapeHtml(s.title)}</span>
+        <button class="btn btn-icon btn-secondary" style="font-size:11px;" onclick="deleteTemplateSubtask('${d.id}','${s.id}')" title="Remove">×</button>
+      </div>
+    `).join('');
+    html += `</div>`;
+  }
+  html += `<div style="display:flex;gap:6px;margin-top:8px;">
+    <input type="text" id="tmplSubInput_${d.id}" placeholder="+ Add subtask, press Enter" style="font-size:12px;padding:6px 10px;" onkeydown="handleTemplateSubtaskKey(event,'${d.id}')">
+    <button class="btn btn-small btn-secondary" onclick="addTemplateSubtask('${d.id}')">Add</button>
+  </div></div>`;
+  // TABLES
+  html += `<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:12px;color:var(--text-dim);">📊 Tables <span class="tables-count-label">${(d.tables||[]).length > 0 ? `(${d.tables.length})` : ''}</span></span>
+      <button class="btn btn-small btn-secondary" onclick="addTableToTask('${d.id}')">+ Add Table</button>
+    </div>
+    <div class="tablesContainer" data-task-id="${d.id}" id="tablesContainer_${d.id}">
+      ${renderTaskTables(d)}
+    </div>
+  </div>`;
+  return html;
+}
+
+function toggleTemplateDetail(id) {
+  if (openTemplateDetails.has(id)) openTemplateDetails.delete(id);
+  else openTemplateDetails.add(id);
+  const isOpen = openTemplateDetails.has(id);
+  document.querySelectorAll(`.template-row[data-template-id="${id}"]`).forEach(row => {
+    const detail = row.querySelector('.template-detail');
+    const chev = row.querySelector('.task-expand-chevron');
+    if (detail) {
+      detail.style.display = isOpen ? 'block' : 'none';
+      detail.classList.toggle('open', isOpen);
+      if (isOpen && detail.innerHTML.trim() === '') {
+        const d = state.templateTasks.find(t => t.id === id);
+        if (d) detail.innerHTML = renderTemplateDetail(d);
+      }
+    }
+    if (chev) chev.classList.toggle('open', isOpen);
+  });
+}
+
+function getTemplate(id) { return (state.templateTasks || []).find(t => t.id === id); }
+
+function setTemplateNotes(id, val) {
+  const d = getTemplate(id);
+  if (d) { d.notes = val; saveState(); }
+}
+
+function toggleTemplateSubtask(templateId, subId) {
+  const d = getTemplate(templateId);
+  if (!d) return;
+  normTemplateSubtasks(d);
+  const s = d.subtasks.find(x => x.id === subId);
+  if (s) { s.done = !s.done; saveState(); refreshTemplateDetail(templateId); }
+}
+
+function deleteTemplateSubtask(templateId, subId) {
+  const d = getTemplate(templateId);
+  if (!d) return;
+  normTemplateSubtasks(d);
+  d.subtasks = d.subtasks.filter(x => x.id !== subId);
+  saveState();
+  refreshTemplateDetail(templateId);
+}
+
+function addTemplateSubtask(templateId) {
+  const input = document.getElementById('tmplSubInput_' + templateId);
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) return;
+  const d = getTemplate(templateId);
+  if (!d) return;
+  normTemplateSubtasks(d);
+  d.subtasks.push({ id: uid(), title: val, done: false });
+  input.value = '';
+  saveState();
+  refreshTemplateDetail(templateId);
+  setTimeout(() => { const el = document.getElementById('tmplSubInput_' + templateId); if (el) el.focus(); }, 50);
+}
+
+function handleTemplateSubtaskKey(e, templateId) {
+  if (e.key === 'Enter') { e.preventDefault(); addTemplateSubtask(templateId); }
+}
+
+function refreshTemplateDetail(templateId) {
+  const d = getTemplate(templateId);
+  if (!d) return;
+  document.querySelectorAll(`.template-row[data-template-id="${templateId}"]`).forEach(row => {
+    const detail = row.querySelector('.template-detail');
+    if (detail && detail.classList.contains('open')) {
+      detail.innerHTML = renderTemplateDetail(d);
+    }
+    // update header counts
+    const subLbl = row.querySelector('.tmpl-sub-count');
+    const tblLbl = row.querySelector('.tmpl-table-count');
+    const sc = (d.subtasks || []).length, tc = (d.tables || []).length;
+    if (subLbl) subLbl.textContent = sc > 0 ? `☑ ${sc} subtask${sc > 1 ? 's' : ''}` : '';
+    if (tblLbl) tblLbl.textContent = tc > 0 ? `▦ ${tc} table${tc > 1 ? 's' : ''}` : '';
+  });
 }
 
 function openTemplateModal(id = null) {
@@ -6707,7 +6848,7 @@ function openTemplateModal(id = null) {
     document.getElementById('tmplPriority').value = d.priority || 'medium';
     document.getElementById('tmplPomo').value = d.estimatedPomodoros || 1;
     document.getElementById('tmplNotes').value = d.notes || '';
-    document.getElementById('tmplSubtasks').value = (d.subtasks || []).join('\n');
+    document.getElementById('tmplSubtasks').value = (d.subtasks || []).map(s => typeof s === 'string' ? s : s.title).join('\n');
     setTemplateType(d.taskType === 'complex' ? 'complex' : 'regular');
     document.getElementById('tmplSpanDays').value = d.spanDays || 5;
     document.getElementById('tmplStartOffset').value = d.startOffsetDays || 0;
@@ -6743,22 +6884,28 @@ function saveTemplate() {
   const title = document.getElementById('tmplTitle').value.trim();
   if (!title) return toast('⚠ Title required');
   const isComplex = currentTemplateType === 'complex';
+  const subLines = document.getElementById('tmplSubtasks').value.split('\n').map(s => s.trim()).filter(Boolean);
   const data = {
     title,
     taskType: isComplex ? 'complex' : 'regular',
     priority: document.getElementById('tmplPriority').value,
     estimatedPomodoros: parseInt(document.getElementById('tmplPomo').value) || 1,
     notes: document.getElementById('tmplNotes').value,
-    subtasks: document.getElementById('tmplSubtasks').value.split('\n').map(s => s.trim()).filter(Boolean),
     spanDays: isComplex ? (parseInt(document.getElementById('tmplSpanDays').value) || 5) : null,
     startOffsetDays: isComplex ? (parseInt(document.getElementById('tmplStartOffset').value) || 0) : null
   };
   if (editingTemplateId) {
     const d = state.templateTasks.find(x => x.id === editingTemplateId);
-    // preserve existing tables
+    normTemplateSubtasks(d);
+    // Merge subtask lines, preserving done-state of matching titles, keep tables
+    data.subtasks = subLines.map(line => {
+      const existing = (d.subtasks || []).find(s => s.title === line);
+      return existing || { id: uid(), title: line, done: false };
+    });
     data.tables = d.tables || [];
     Object.assign(d, data);
   } else {
+    data.subtasks = subLines.map(line => ({ id: uid(), title: line, done: false }));
     state.templateTasks.push({ id: uid(), ...data, tables: [], createdAt: new Date().toISOString() });
   }
   saveState();
@@ -6817,7 +6964,7 @@ function saveTaskAsTemplate(taskId) {
     priority: src.priority || 'medium',
     estimatedPomodoros: src.estimatedPomodoros || 1,
     notes: src.notes || '',
-    subtasks: (src.subtasks || []).map(s => s.title),
+    subtasks: (src.subtasks || []).map(s => ({ id: uid(), title: s.title, done: false })),
     tables,
     spanDays,
     startOffsetDays,
@@ -6908,7 +7055,7 @@ function confirmAddTemplateToProject() {
     endDate,
     tables,
     notes: d.notes || '',
-    subtasks: (d.subtasks || []).map(line => ({ id: uid(), title: line, done: false })),
+    subtasks: (d.subtasks || []).map(s => ({ id: uid(), title: (typeof s === 'string' ? s : s.title), done: false })),
     qualifications: [],
     timeBoxes: [],
     manualOrder: null,
