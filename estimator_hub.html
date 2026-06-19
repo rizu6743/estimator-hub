@@ -3122,6 +3122,7 @@ table.ctask-table th {
           <option value="revision">🟡 Working on revision</option>
           <option value="handover">🤝 On Handover</option>
           <option value="submitted">📤 Submitted</option>
+          <option value="onhold">⏸ On Hold</option>
           <option value="closed">🔒 Closed</option>
         </select>
       </div>
@@ -3410,6 +3411,8 @@ function today() { return toLocalDateStr(new Date()); }
 // or a complex task whose start..end span includes today (and not completed).
 function isTaskForToday(task, t) {
   t = t || today();
+  // Hide tasks from on-hold / closed projects
+  if (isProjectTasksHidden(task.projectId)) return false;
   if (task.taskType === 'complex' && task.startDate && task.endDate) {
     return task.startDate <= t && t <= task.endDate;
   }
@@ -6072,7 +6075,12 @@ function renderTasks() {
   else if (filter === 'overdue') tasks = tasks.filter(x => x.scheduledDate < t && x.status !== 'completed');
   else if (filter === 'completed') tasks = tasks.filter(x => x.status === 'completed');
   else if (filter === 'general') tasks = tasks.filter(x => !x.projectId);
-  if (projFilter !== 'all') tasks = tasks.filter(x => x.projectId === projFilter);
+  if (projFilter !== 'all') {
+    tasks = tasks.filter(x => x.projectId === projFilter);
+  } else {
+    // Hide tasks from on-hold / closed projects unless the user picks that project explicitly
+    tasks = tasks.filter(x => !isProjectTasksHidden(x.projectId));
+  }
 
   // Apply consistent display sort (rank → manual → priority, completed last)
   // For tasks view we also need to group by date when filter is 'all' or 'completed'
@@ -6258,12 +6266,21 @@ const STATUS_META = {
   revision:  { label: 'In revision', color: '#f59e0b', icon: '🟡' },
   handover:  { label: 'On Handover', color: '#a855f7', icon: '🤝' },
   submitted: { label: 'Submitted',   color: '#3b82f6', icon: '📤' },
+  onhold:    { label: 'On Hold',     color: '#ec4899', icon: '⏸' },
   closed:    { label: 'Closed',      color: '#6b7280', icon: '🔒' }
 };
-const STATUS_ORDER = ['working', 'revision', 'handover', 'submitted', 'closed'];
+const STATUS_ORDER = ['working', 'revision', 'handover', 'submitted', 'onhold', 'closed'];
 
 function isProjectActive(p) {
   return p.status === 'working' || p.status === 'revision' || p.status === 'handover';
+}
+
+// Tasks from these statuses should be HIDDEN from today / tasks / schedule
+function isProjectTasksHidden(projectId) {
+  if (!projectId) return false; // general tasks always show
+  const p = state.projects.find(x => x.id === projectId);
+  if (!p) return false;
+  return p.status === 'onhold' || p.status === 'closed';
 }
 
 function getProjectTypeLabel(p) {
@@ -7324,7 +7341,7 @@ function applyDefaultTasksToProject(projectId) {
 
 function renderProjects() {
   // Count projects by status
-  const counts = { working: 0, revision: 0, handover: 0, submitted: 0, closed: 0, all: state.projects.length };
+  const counts = { working: 0, revision: 0, handover: 0, submitted: 0, onhold: 0, closed: 0, all: state.projects.length };
   state.projects.forEach(p => {
     const s = p.status || 'working';
     if (counts[s] !== undefined) counts[s]++;
@@ -7339,6 +7356,7 @@ function renderProjects() {
       { id: 'revision',  label: '🟡 In revision',  count: counts.revision },
       { id: 'handover',  label: '🤝 On Handover',  count: counts.handover },
       { id: 'submitted', label: '📤 Submitted',    count: counts.submitted },
+      { id: 'onhold',    label: '⏸ On Hold',       count: counts.onhold },
       { id: 'closed',    label: '🔒 Closed',       count: counts.closed },
       { id: 'all',       label: '📁 All',          count: counts.all }
     ];
@@ -7804,7 +7822,7 @@ function renderSchedule() {
   }
 
   // Get scheduleable tasks (not completed) and group by date
-  const openTasks = state.tasks.filter(t => t.status !== 'completed');
+  const openTasks = state.tasks.filter(t => t.status !== 'completed' && !isProjectTasksHidden(t.projectId));
   const tasksByDate = {};
   const unscheduled = [];
   const spanDatesInWindow = new Set(days.map(d => d.date));
@@ -8063,7 +8081,7 @@ function renderTimebox() {
 function renderTaskPool(date) {
   const poolFilter = document.getElementById('timeboxPoolFilter').value;
   const projFilter = document.getElementById('timeboxProjectFilter').value;
-  let tasks = state.tasks.filter(t => t.status !== 'completed');
+  let tasks = state.tasks.filter(t => t.status !== 'completed' && !isProjectTasksHidden(t.projectId));
 
   if (poolFilter === 'day') tasks = tasks.filter(t => t.scheduledDate === date);
   else if (poolFilter === 'unassigned') tasks = tasks.filter(t => !isTaskAssignedOnDate(t, date));
