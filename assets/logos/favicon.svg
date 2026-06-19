@@ -1,0 +1,28 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+
+  <defs>
+    <linearGradient id="favGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="10" y="10" width="108" height="108" rx="26" fill="url(#favGrad)"/>
+
+  <path
+    d="M35 35 H70
+       M35 64 H63
+       M35 93 H70"
+    stroke="white"
+    stroke-width="9"
+    stroke-linecap="round"/>
+
+  <path
+    d="M80 35 V93
+       M100 35 V93
+       M80 64 H100"
+    stroke="white"
+    stroke-width="9"
+    stroke-linecap="round"/>
+
+</svg>

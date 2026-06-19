@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Estimator Hub — Tender Productivity OS</title>
+<link rel="icon" type="image/svg+xml" href="assets/logos/favicon.svg">
+<link rel="apple-touch-icon" href="assets/logos/favicon.svg">
 <script>
 // Apply saved theme immediately to prevent flash of unstyled content
 (function() {
@@ -118,6 +120,119 @@ textarea { resize: vertical; min-height: 60px; }
 .brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
 .brand h1 span { color: var(--accent); }
 .brand p { font-size: 11px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ====================================================================
+   ASSET INTEGRATION SYSTEM — responsive images from /assets, with
+   graceful fallback to existing emoji/text when a file is missing.
+   ==================================================================== */
+/* Brand logo slot (hidden until a logo loads) */
+.brand-logo {
+  display: none;            /* shown by JS only when the image loads */
+  max-width: 150px;
+  max-height: 46px;
+  width: auto;
+  height: auto;
+  margin-bottom: 8px;
+}
+.brand-logo.loaded { display: block; }
+/* When the logo is a small square favicon, render as a compact mark beside text */
+.brand-logo.logo-mark {
+  max-width: 34px;
+  max-height: 34px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+/* When a logo is present, optionally shrink the text brand (kept as fallback) */
+.brand.has-logo h1 { font-size: 15px; }
+
+/* SVG icons that can replace emoji in nav and elsewhere */
+.asset-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: none;            /* hidden until loaded; emoji stays visible meanwhile */
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.asset-icon.loaded { display: inline-block; }
+/* When the SVG icon has loaded, hide the emoji sibling */
+.icon.asset-hidden { display: none; }
+/* Make single-color SVG icons adapt to light/dark via CSS filter when tagged */
+[data-theme="dark"] .asset-icon.tintable { filter: brightness(0) invert(0.85); }
+.asset-icon.tintable { filter: none; }
+
+/* Dashboard / hero graphics — responsive, lightweight, theme-aware */
+.asset-graphic-wrap {
+  display: none;            /* shown only when the graphic loads */
+  width: 100%;
+  margin-bottom: 14px;
+}
+.asset-graphic-wrap.loaded { display: block; }
+.asset-graphic {
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  display: block;
+}
+[data-theme="dark"] .asset-graphic { opacity: 0.92; }
+
+/* Generic badge image (e.g. XP badge) */
+.asset-badge {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  display: none;
+  vertical-align: middle;
+}
+.asset-badge.loaded { display: inline-block; }
+
+/* Empty-state graphics — show a friendly illustration above the text */
+.asset-empty-state .empty-graphic { display: none; max-width: 180px; margin: 0 auto 10px; }
+.asset-empty-state .empty-graphic.loaded { display: block; }
+.asset-empty-state .empty-graphic.loaded + .empty-emoji { display: none; }
+.asset-empty-state .empty-graphic .asset-graphic { max-height: 140px; }
+
+/* XP / streak badge images shown beside their stats */
+.stat-badge-img {
+  width: 26px; height: 26px; object-fit: contain;
+  display: none; vertical-align: middle; margin-right: 4px;
+}
+.stat-badge-img.loaded { display: inline-block; }
+.stat-badge-img.loaded + .streak-emoji { display: none; }
+
+/* Achievement badge next to the level/stage name */
+.stage-badge {
+  width: 22px; height: 22px; object-fit: contain;
+  display: none; vertical-align: middle; margin-right: 6px;
+}
+.stage-badge.loaded { display: inline-block; }
+
+/* ====================================================================
+   PREMIUM SAAS POLISH (Linear / Arc / Notion / Fluent inspired)
+   Purely additive refinements — no layout or logic changes.
+   ==================================================================== */
+.brand.has-logo { display: flex; flex-direction: column; align-items: flex-start; }
+.nav-item { border-radius: 0 8px 8px 0; transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.08s ease; }
+.nav-item:active { transform: translateX(1px); }
+.asset-icon { transition: transform 0.16s ease, opacity 0.16s ease; }
+.nav-item:hover .asset-icon { transform: scale(1.08); }
+/* Crisper card elevation in light mode, soft glow in dark */
+.card { transition: box-shadow 0.2s ease, transform 0.08s ease; }
+[data-theme="light"] .card:hover { box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06); }
+[data-theme="dark"] .card:hover { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35); }
+/* Hero graphic gets a subtle premium frame */
+#dashboardHeroWrap.loaded .asset-graphic {
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(16,185,129,0.04), rgba(168,85,247,0.03));
+}
+/* Smooth fade-in for any asset image when it loads */
+.asset-icon.loaded, .asset-badge.loaded, .asset-graphic, .brand-logo.loaded {
+  animation: assetFadeIn 0.3s ease;
+}
+@keyframes assetFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
 .nav-item {
   padding: 11px 22px;
   display: flex;
@@ -2165,27 +2280,28 @@ table.ctask-table th {
 <body>
 
 <div class="sidebar">
-  <div class="brand">
+  <div class="brand" id="brandArea">
+    <img class="brand-logo" id="brandLogo" alt="Estimator Hub logo">
     <h1>Estimator <span>Hub</span></h1>
     <p>Tender Productivity OS</p>
   </div>
-  <div class="nav-item active" data-view="dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
-  <div class="nav-item" data-view="tasks"><span class="icon">✓</span><span>Tasks</span></div>
+  <div class="nav-item active" data-view="dashboard"><span class="icon" data-asset="icons/dashboard.svg">📊</span><span>Dashboard</span></div>
+  <div class="nav-item" data-view="tasks"><span class="icon" data-asset="icons/tasks.svg">✓</span><span>Tasks</span></div>
   <div class="nav-group">
     <div class="nav-item" id="projectsNavItem" data-view="projects">
-      <span class="icon">📁</span><span>Projects</span>
+      <span class="icon" data-asset="icons/projects.svg">📁</span><span>Projects</span>
       <span class="nav-chevron" id="projectsChevron" onclick="event.stopPropagation();toggleProjectsList()">▾</span>
     </div>
     <div class="nav-sublist" id="projectsSublist"></div>
   </div>
-  <div class="nav-item" data-view="pomodoro"><span class="icon">⏱</span><span>Pomodoro</span></div>
-  <div class="nav-item" data-view="timebox"><span class="icon">🗓</span><span>Time Box</span></div>
-  <div class="nav-item" data-view="schedule"><span class="icon">📆</span><span>2-Week Schedule</span></div>
-  <div class="nav-item" data-view="analytics"><span class="icon">📈</span><span>Analytics</span></div>
-  <div class="nav-item" data-view="review"><span class="icon">📝</span><span>Daily Review</span></div>
-  <div class="nav-item" data-view="settings"><span class="icon">⚙</span><span>Settings</span></div>
+  <div class="nav-item" data-view="pomodoro"><span class="icon" data-asset="icons/pomodoro.svg">⏱</span><span>Pomodoro</span></div>
+  <div class="nav-item" data-view="timebox"><span class="icon" data-asset="icons/timebox.svg">🗓</span><span>Time Box</span></div>
+  <div class="nav-item" data-view="schedule"><span class="icon" data-asset="icons/schedule.svg">📆</span><span>2-Week Schedule</span></div>
+  <div class="nav-item" data-view="analytics"><span class="icon" data-asset="icons/analytics.svg">📈</span><span>Analytics</span></div>
+  <div class="nav-item" data-view="review"><span class="icon" data-asset="icons/review.svg">📝</span><span>Daily Review</span></div>
+  <div class="nav-item" data-view="settings"><span class="icon" data-asset="icons/settings.svg">⚙</span><span>Settings</span></div>
   <div class="sidebar-footer">
-    <div class="streak-badge">🔥 <span id="streakDisplay">0 day streak</span></div>
+    <div class="streak-badge"><img class="asset-badge stat-badge-img" data-asset="badges/streak.svg" alt="" loading="lazy"><span class="streak-emoji">🔥</span> <span id="streakDisplay">0 day streak</span></div>
     <div>Level <span id="levelDisplay">1</span> • <span id="xpDisplay">0 XP</span></div>
     <div class="sync-status" id="syncStatus" onclick="goToSyncSettings()">
       <span class="sync-dot offline" id="syncDot"></span>
@@ -2201,6 +2317,10 @@ table.ctask-table th {
 
   <!-- ==================== DASHBOARD ==================== -->
   <div class="view active" id="view-dashboard">
+    <!-- OPTIONAL HERO GRAPHIC (shows only if assets/graphics/hero-estimator.svg exists) -->
+    <div class="asset-graphic-wrap" id="dashboardHeroWrap">
+      <img class="asset-graphic" id="dashboardHero" data-asset="graphics/hero-estimator.svg" alt="">
+    </div>
     <!-- REAL-TIME CLOCK -->
     <div class="dashboard-clock" id="dashboardClock" onclick="goToTimezoneSettings()" title="Click to change timezone">
       <span class="clock-icon">🕐</span>
@@ -2272,7 +2392,10 @@ table.ctask-table th {
           <div class="tree-bg"></div>
           <svg class="tree-svg" id="treeSvg" viewBox="0 0 280 240"></svg>
           <div class="tree-info">
-            <div class="tree-stage-name" id="treeStageName">Seed</div>
+            <div class="tree-stage-name" id="treeStageName">
+              <img class="asset-badge stage-badge" id="stageBadge" data-asset="badges/forest-growth.svg" alt="" loading="lazy">
+              <span id="treeStageNameText">Seed</span>
+            </div>
             <div class="tree-xp-bar"><div class="tree-xp-fill" id="treeXPFill" style="width:0%"></div></div>
             <div class="tree-xp-text" id="treeXPText">0 / 50 XP to next stage</div>
           </div>
@@ -4145,7 +4268,19 @@ function drawTree() {
 
   // Update info
   const stageName = scene.stageName;
-  document.getElementById('treeStageName').textContent = `Level ${level} · ${stageName}`;
+  const stageTextEl = document.getElementById('treeStageNameText');
+  if (stageTextEl) stageTextEl.textContent = `Level ${level} · ${stageName}`;
+  // Swap achievement badge by milestone: forest-growth → master-estimator at L10+
+  const badgeEl = document.getElementById('stageBadge');
+  if (badgeEl) {
+    const want = level >= 10 ? 'badges/master-estimator.svg' : 'badges/forest-growth.svg';
+    if (badgeEl.getAttribute('data-asset') !== want) {
+      badgeEl.setAttribute('data-asset', want);
+      badgeEl.classList.remove('loaded');
+      const url = ASSET_BASE + want;
+      tryLoadAsset(url).then(ok => { if (ok) { badgeEl.src = url; badgeEl.classList.add('loaded'); } });
+    }
+  }
   const info = getXPToNextLevel(xp);
   const pct = (info.xpInLevel / info.xpForLevel) * 100;
   document.getElementById('treeXPFill').style.width = Math.min(100, pct) + '%';
@@ -5922,7 +6057,10 @@ function renderDashboard() {
   const sortedToday = sortTasksForDisplay(todayTasks);
   const dashList = document.getElementById('dashTaskList');
   if (sortedToday.length === 0) {
-    dashList.innerHTML = '<div class="empty"><div class="icon">🌅</div>No tasks scheduled for today.<br>Click "+ New Task" to get started.</div>';
+    dashList.innerHTML = '<div class="empty asset-empty-state">'
+      + '<div class="asset-graphic-wrap empty-graphic"><img class="asset-graphic" data-asset="graphics/productivity.svg" alt="" loading="lazy"></div>'
+      + '<div class="icon empty-emoji">🌅</div>No tasks scheduled for today.<br>Click "+ New Task" to get started.</div>';
+    if (typeof initGraphics === 'function') initGraphics();
   } else {
     dashList.innerHTML = sortedToday.map(t => renderTaskItem(t)).join('');
   }
@@ -7372,7 +7510,10 @@ function renderProjects() {
   if (projectStatusFilter === 'defaults') projectStatusFilter = 'working';
 
   if (state.projects.length === 0) {
-    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;"><div class="icon">📁</div>No projects yet. Create one to group your tender tasks.</div>';
+    grid.innerHTML = '<div class="empty asset-empty-state" style="grid-column:1/-1;">'
+      + '<div class="asset-graphic-wrap empty-graphic"><img class="asset-graphic" data-asset="graphics/project-management.svg" alt="" loading="lazy"></div>'
+      + '<div class="icon empty-emoji">📁</div>No projects yet. Create one to group your tender tasks.</div>';
+    if (typeof initGraphics === 'function') initGraphics();
     return;
   }
 
@@ -9719,6 +9860,7 @@ function toggleTheme() {
   const next = current === 'light' ? 'dark' : 'light';
   localStorage.setItem(THEME_KEY, next);
   applyTheme(next);
+  if (typeof refreshAssetsForTheme === 'function') refreshAssetsForTheme();
 }
 
 /* ====================================================================
@@ -9764,6 +9906,136 @@ window.addEventListener('online', () => {
   if (state.settings.driveSyncEnabled) syncNow();
 });
 window.addEventListener('offline', () => setSyncStatus('offline', 'Offline'));
+
+/* ====================================================================
+   ASSET INTEGRATION ENGINE  (v2)
+   Loads images from /assets in the repo. Every asset has an emoji/text
+   fallback that stays unless the image loads. Missing files never break.
+   Lazy-loaded, dark-mode aware, premium-SaaS styling.
+   ==================================================================== */
+const ASSET_BASE = 'assets/';
+
+const _assetCache = {};   // url -> true/false (exists)
+function tryLoadAsset(url) {
+  if (url in _assetCache) return Promise.resolve(_assetCache[url]);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => { _assetCache[url] = true; resolve(true); };
+    img.onerror = () => { _assetCache[url] = false; resolve(false); };
+    img.src = url;
+  });
+}
+
+// Pick the first asset that exists from a list of candidate paths.
+async function pickFirstAsset(paths) {
+  for (const p of paths) {
+    if (await tryLoadAsset(ASSET_BASE + p)) return ASSET_BASE + p;
+  }
+  return null;
+}
+
+// 1) Brand logo — prefer theme-specific eh-logo, else generic, else favicon.
+async function initBrandLogo() {
+  const el = document.getElementById('brandLogo');
+  if (!el) return;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const candidates = isDark
+    ? ['logos/eh-logo-dark.svg', 'logos/eh-logo.svg', 'logos/favicon.svg']
+    : ['logos/eh-logo.svg', 'logos/eh-logo-dark.svg', 'logos/favicon.svg'];
+  const url = await pickFirstAsset(candidates);
+  if (url) {
+    el.src = url;
+    el.loading = 'lazy';
+    el.classList.add('loaded');
+    // If it's the small favicon, render it as a compact mark beside the text
+    el.classList.toggle('logo-mark', url.includes('favicon'));
+    const brand = document.getElementById('brandArea');
+    if (brand) brand.classList.add('has-logo');
+  }
+}
+
+// 2) Nav + inline emoji icons — replace emoji with SVG when present.
+async function initAssetIcons() {
+  const nodes = document.querySelectorAll('[data-asset]');
+  for (const node of nodes) {
+    if (node.tagName === 'IMG') continue;          // real <img> handled elsewhere
+    if (node.dataset.assetDone) continue;          // idempotent
+    const rel = node.getAttribute('data-asset');
+    if (!rel) continue;
+    const url = ASSET_BASE + rel;
+    const ok = await tryLoadAsset(url);
+    if (!ok) continue;                             // keep emoji
+    const icon = document.createElement('img');
+    icon.className = 'asset-icon tintable loaded';
+    icon.src = url;
+    icon.loading = 'lazy';
+    icon.alt = '';
+    node.parentNode.insertBefore(icon, node);
+    node.classList.add('asset-hidden');
+    node.dataset.assetDone = '1';
+  }
+}
+
+// 3) Generic graphic slots — any .asset-graphic <img data-asset=...>
+async function initGraphics() {
+  const imgs = document.querySelectorAll('img.asset-graphic[data-asset]');
+  for (const img of imgs) {
+    const rel = img.getAttribute('data-asset');
+    if (!rel) continue;
+    const url = ASSET_BASE + rel;
+    if (await tryLoadAsset(url)) {
+      img.src = url;
+      img.loading = 'lazy';
+      const wrap = img.closest('.asset-graphic-wrap');
+      if (wrap) wrap.classList.add('loaded');
+    }
+  }
+}
+
+// 4) Badge images — any img.asset-badge[data-asset]
+async function initBadges() {
+  const imgs = document.querySelectorAll('img.asset-badge[data-asset]');
+  for (const img of imgs) {
+    const rel = img.getAttribute('data-asset');
+    if (!rel) continue;
+    const url = ASSET_BASE + rel;
+    if (await tryLoadAsset(url)) {
+      img.src = url;
+      img.loading = 'lazy';
+      img.classList.add('loaded');
+    }
+  }
+}
+
+// Re-tint / re-pick logo when theme toggles
+function refreshAssetsForTheme() {
+  const el = document.getElementById('brandLogo');
+  if (el) { el.classList.remove('loaded'); initBrandLogo(); }
+}
+
+// Inline helper used by render code: returns an <img> that lazily resolves,
+// falling back to the emoji if the file is missing.
+function assetIconHTML(relPath, fallbackEmoji) {
+  const id = 'ai_' + Math.random().toString(36).slice(2, 9);
+  // Emoji shows immediately; async upgrade swaps it if the asset exists.
+  setTimeout(async () => {
+    const url = ASSET_BASE + relPath;
+    if (await tryLoadAsset(url)) {
+      const span = document.getElementById(id);
+      if (span) span.innerHTML = `<img class="asset-icon tintable loaded" src="${url}" loading="lazy" alt="">`;
+    }
+  }, 0);
+  return `<span id="${id}" class="icon">${fallbackEmoji}</span>`;
+}
+
+(function initAssets() {
+  try {
+    initBrandLogo();
+    initAssetIcons();
+    initGraphics();
+    initBadges();
+  } catch (e) { /* assets are optional — never break the app */ }
+})();
 </script>
 </body>
 </html>
