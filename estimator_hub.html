@@ -222,11 +222,6 @@ textarea { resize: vertical; min-height: 60px; }
 .card { transition: box-shadow 0.2s ease, transform 0.08s ease; }
 [data-theme="light"] .card:hover { box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06); }
 [data-theme="dark"] .card:hover { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35); }
-/* Hero graphic gets a subtle premium frame */
-#dashboardHeroWrap.loaded .asset-graphic {
-  border: 1px solid var(--border);
-  background: linear-gradient(135deg, rgba(16,185,129,0.04), rgba(168,85,247,0.03));
-}
 /* Smooth fade-in for any asset image when it loads */
 .asset-icon.loaded, .asset-badge.loaded, .asset-graphic, .brand-logo.loaded {
   animation: assetFadeIn 0.3s ease;
@@ -2317,10 +2312,6 @@ table.ctask-table th {
 
   <!-- ==================== DASHBOARD ==================== -->
   <div class="view active" id="view-dashboard">
-    <!-- OPTIONAL HERO GRAPHIC (shows only if assets/graphics/hero-estimator.svg exists) -->
-    <div class="asset-graphic-wrap" id="dashboardHeroWrap">
-      <img class="asset-graphic" id="dashboardHero" data-asset="graphics/hero-estimator.svg" alt="">
-    </div>
     <!-- REAL-TIME CLOCK -->
     <div class="dashboard-clock" id="dashboardClock" onclick="goToTimezoneSettings()" title="Click to change timezone">
       <span class="clock-icon">🕐</span>
