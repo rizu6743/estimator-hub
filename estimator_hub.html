@@ -2410,15 +2410,15 @@ table.ctask-table th {
           </select>
           <div class="pomo-mini-stats">
             <div><strong id="dashPomoToday">0</strong>today</div>
-            <div><strong id="dashPomoStreak">0</strong>streak</div>
-            <div><strong id="dashPomoTotal">0</strong>all-time</div>
+            <div title="Consecutive focus blocks without skipping"><strong id="dashPomoStreak">0</strong>streak</div>
+            <div title="Best streak ever / total pomodoros"><strong id="dashPomoTotal">0</strong>all-time</div>
           </div>
         </div>
 
         <div class="card" style="margin-top:16px;">
           <div class="card-title"><span><span class="icon">⚡</span> Small Win Streak</span></div>
           <div style="font-size:32px;font-weight:700;color:var(--accent-warm);" id="smallWinCount">0</div>
-          <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">tasks chained without breaking focus</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:4px;"><strong id="smallWinUnit">tasks</strong> completed in a row — resets if you miss a working day</div>
           <div class="win-quote" id="winQuote">
             "Success is the product of daily habits—not once-in-a-lifetime transformations."
             <span class="author">— James Clear, Atomic Habits</span>
@@ -3413,6 +3413,7 @@ const DEFAULT_STATE = {
     todayCount: 0,
     todayDate: null,
     streak: 0,
+    longestStreak: 0,
     total: 0
   }
 };
@@ -3462,6 +3463,16 @@ function loadState() {
     // Ensure defaultTasks array exists
     if (!Array.isArray(parsed.defaultTasks)) parsed.defaultTasks = [];
     if (!Array.isArray(parsed.templateTasks)) parsed.templateTasks = [];
+    // Fix legacy pomodoro streak that was wrongly equal to total (never reset).
+    if (parsed.pomodoroState) {
+      if (parsed.pomodoroState.longestStreak === undefined) {
+        // If old streak == total (the bug), it was never a real streak — reset it.
+        if (parsed.pomodoroState.streak === parsed.pomodoroState.total && parsed.pomodoroState.total > 0) {
+          parsed.pomodoroState.streak = 0;
+        }
+        parsed.pomodoroState.longestStreak = parsed.pomodoroState.streak || 0;
+      }
+    }
     // Ensure complex-task fields exist on all tasks
     if (Array.isArray(parsed.tasks)) {
       parsed.tasks.forEach(t => {
@@ -7809,6 +7820,10 @@ function skipPomodoro() {
   clearInterval(pomoTimer);
   pomoRunning = false;
   pomoEndTime = null;
+  // Skipping a FOCUS block breaks the session streak
+  if (pomoPhase === 'focus') {
+    state.pomodoroState.streak = 0;
+  }
   completePomoPhase(true);
 }
 
@@ -7828,6 +7843,10 @@ function completePomoPhase(skipped = false) {
       state.pomodoroState.todayCount++;
       state.pomodoroState.streak++;
       state.pomodoroState.total++;
+      // Track best-ever session streak
+      if (state.pomodoroState.streak > (state.pomodoroState.longestStreak || 0)) {
+        state.pomodoroState.longestStreak = state.pomodoroState.streak;
+      }
       if (currentPomoTaskId) {
         const t = state.tasks.find(x => x.id === currentPomoTaskId);
         if (t) t.completedPomodoros = (t.completedPomodoros || 0) + 1;
