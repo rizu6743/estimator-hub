@@ -217,6 +217,49 @@ textarea { resize: vertical; min-height: 60px; }
 }
 
 /* ====================================================================
+   PROJECT WORKFLOW TIMELINE (START → categories → END)
+   ==================================================================== */
+.wf-timeline { position: relative; padding: 8px 0 8px 0; margin-top: 8px; }
+.wf-line {
+  position: absolute;
+  left: 13px; top: 18px; bottom: 18px;
+  width: 2px; background: var(--border); z-index: 0;
+}
+.wf-node { position: relative; display: flex; gap: 14px; z-index: 1; padding-bottom: 18px; }
+.wf-node:last-child { padding-bottom: 0; }
+.wf-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0;
+  background: var(--bg-card); border: 2px solid var(--border); z-index: 1;
+}
+.wf-endpoint .wf-dot {
+  background: var(--text); color: var(--bg-card);
+  border-color: var(--text); font-weight: 700; font-size: 9px; letter-spacing: 0.5px;
+}
+.wf-body { flex: 1; min-width: 0; }
+.wf-stage-head { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; padding-top: 3px; flex-wrap: wrap; }
+.wf-stage-count { font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--bg-input-soft); padding: 2px 8px; border-radius: 10px; }
+.wf-node.complete .wf-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.wf-node.partial .wf-dot { border-color: var(--accent); }
+.wf-node.empty { opacity: 0.5; }
+.wf-tasks { margin: 8px 0 0 0; display: flex; flex-direction: column; gap: 5px; }
+.wf-task {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; padding: 6px 10px;
+  background: var(--bg-input-soft); border-radius: 7px;
+  border-left: 3px solid var(--border);
+}
+.wf-task.done { opacity: 0.65; border-left-color: var(--accent); }
+.wf-task.done .wf-task-title { text-decoration: line-through; color: var(--text-muted); }
+.wf-task-check { font-size: 13px; flex-shrink: 0; }
+.wf-task-title { flex: 1; min-width: 0; }
+.wf-task-meta { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.wf-empty-note { font-size: 11px; color: var(--text-muted); font-style: italic; padding: 4px 10px; }
+.wf-stage-mini-bar { height: 4px; background: var(--bg-input-soft); border-radius: 2px; margin-top: 8px; overflow: hidden; max-width: 220px; }
+.wf-stage-mini-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+
+/* ====================================================================
    PREMIUM SAAS POLISH (Linear / Arc / Notion / Fluent inspired)
    Purely additive refinements — no layout or logic changes.
    ==================================================================== */
@@ -3317,6 +3360,31 @@ table.ctask-table th {
   </div>
 </div>
 
+<!-- ==================== PROJECT WORKFLOW MODAL ==================== -->
+<div class="modal-overlay" id="projectWorkflowModal">
+  <div class="modal" style="max-width:760px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+      <div>
+        <h3 style="margin:0;">🗺 Project Workflow</h3>
+        <div id="workflowProjectName" style="font-size:13px;color:var(--text-dim);margin-top:2px;"></div>
+      </div>
+      <button class="btn btn-secondary btn-small" onclick="closeProjectWorkflow()">✕ Close</button>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:12px 0 6px;font-size:12px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="wfShowAll" checked onchange="renderWorkflowTimeline()" style="width:auto;margin:0;">
+        Show task lists
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="wfShowCompleted" checked onchange="renderWorkflowTimeline()" style="width:auto;margin:0;">
+        Show completed tasks
+      </label>
+      <span id="wfProgressLabel" style="margin-left:auto;font-weight:600;color:var(--accent);"></span>
+    </div>
+    <div id="workflowTimeline"></div>
+  </div>
+</div>
+
 <!-- ==================== GOOGLE DRIVE SETUP MODAL ==================== -->
 <div class="modal-overlay" id="setupModal">
   <div class="modal" style="max-width:640px;">
@@ -4422,6 +4490,154 @@ const TASK_CATEGORY_META = {
   takeoff:      { label: 'Quantity Take off',       icon: '📐', color: '#10b981' },
   pricing:      { label: 'Pricing',                 icon: '💲', color: '#ec4899' }
 };
+
+/* ====================================================================
+   PROJECT WORKFLOW TIMELINE
+   START → 5 category milestones (in order) → END, listing the project's
+   tasks under each category. Toggles: show all / show completed.
+   ==================================================================== */
+const WORKFLOW_ORDER = ['tender_docs', 'client', 'subcontract', 'takeoff', 'pricing'];
+let currentWorkflowProjectId = null;
+
+function openProjectWorkflow(projectId) {
+  currentWorkflowProjectId = projectId;
+  const p = state.projects.find(x => x.id === projectId);
+  document.getElementById('workflowProjectName').textContent = p ? p.name : '';
+  // reset toggles to default each open
+  const showAll = document.getElementById('wfShowAll');
+  const showCompleted = document.getElementById('wfShowCompleted');
+  if (showAll) showAll.checked = true;
+  if (showCompleted) showCompleted.checked = true;
+  document.getElementById('projectWorkflowModal').classList.add('open');
+  renderWorkflowTimeline();
+}
+
+function closeProjectWorkflow() {
+  document.getElementById('projectWorkflowModal').classList.remove('open');
+  currentWorkflowProjectId = null;
+}
+
+function renderWorkflowTimeline() {
+  if (!currentWorkflowProjectId) return;
+  const container = document.getElementById('workflowTimeline');
+  const showAll = document.getElementById('wfShowAll').checked;
+  const showCompleted = document.getElementById('wfShowCompleted').checked;
+
+  // All tasks for this project
+  const projTasks = state.tasks.filter(t => t.projectId === currentWorkflowProjectId);
+  const totalCount = projTasks.length;
+  const doneCount = projTasks.filter(t => t.status === 'completed').length;
+  const overallPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+  document.getElementById('wfProgressLabel').textContent =
+    totalCount > 0 ? `${doneCount}/${totalCount} done · ${overallPct}%` : 'No tasks yet';
+
+  let html = '<div class="wf-timeline"><div class="wf-line"></div>';
+
+  // START node
+  html += `
+    <div class="wf-node wf-endpoint">
+      <div class="wf-dot">START</div>
+      <div class="wf-body"><div class="wf-stage-head" style="color:var(--text-dim);">Tender begins</div></div>
+    </div>`;
+
+  // Category stages in order
+  WORKFLOW_ORDER.forEach(catKey => {
+    const meta = TASK_CATEGORY_META[catKey];
+    const catTasks = projTasks.filter(t => t.category === catKey);
+    const catDone = catTasks.filter(t => t.status === 'completed').length;
+    const catTotal = catTasks.length;
+    const pct = catTotal > 0 ? Math.round((catDone / catTotal) * 100) : 0;
+
+    // Stage state class
+    let stateClass = 'empty';
+    if (catTotal > 0 && catDone === catTotal) stateClass = 'complete';
+    else if (catDone > 0) stateClass = 'partial';
+    else if (catTotal > 0) stateClass = '';
+
+    // Which tasks to display based on toggles.
+    // showAll OFF = collapse task lists (show milestone + counts only).
+    // showCompleted OFF = hide completed tasks from the lists.
+    let visible = catTasks;
+    if (!showCompleted) visible = visible.filter(t => t.status !== 'completed');
+
+    html += `
+      <div class="wf-node ${stateClass}">
+        <div class="wf-dot" style="${stateClass === 'complete' ? '' : `border-color:${meta.color};`}">${meta.icon}</div>
+        <div class="wf-body">
+          <div class="wf-stage-head">
+            <span style="color:${meta.color};">${meta.label}</span>
+            <span class="wf-stage-count">${catTotal > 0 ? `${catDone}/${catTotal}` : '0'}</span>
+            ${stateClass === 'complete' ? '<span style="font-size:11px;color:var(--accent);">✓ complete</span>' : ''}
+          </div>`;
+
+    if (catTotal === 0) {
+      html += `<div class="wf-empty-note">No tasks in this stage yet.</div>`;
+    } else {
+      if (showAll) {
+        if (visible.length > 0) {
+          html += `<div class="wf-tasks">`;
+          visible.forEach(t => {
+            const done = t.status === 'completed';
+            const subDone = (t.subtasks || []).filter(s => s.done).length;
+            const subTotal = (t.subtasks || []).length;
+            html += `
+              <div class="wf-task ${done ? 'done' : ''}">
+                <span class="wf-task-check">${done ? '✅' : '⬜'}</span>
+                <span class="wf-task-title">${escapeHtml(t.title)}</span>
+                <span class="wf-task-meta">${subTotal > 0 ? `☑ ${subDone}/${subTotal}` : ''}${t.taskType === 'complex' ? ' 📊' : ''}</span>
+              </div>`;
+          });
+          html += `</div>`;
+        } else {
+          html += `<div class="wf-empty-note">${catDone === catTotal ? 'All tasks complete — hidden by "completed" toggle.' : 'No tasks to show.'}</div>`;
+        }
+      }
+      // mini progress bar (always shown when stage has tasks)
+      html += `<div class="wf-stage-mini-bar"><div class="wf-stage-mini-fill" style="width:${pct}%;background:${meta.color};"></div></div>`;
+    }
+    html += `</div></div>`;
+  });
+
+  // Uncategorized bucket (only if such tasks exist)
+  const uncategorized = projTasks.filter(t => !t.category || !TASK_CATEGORY_META[t.category]);
+  if (uncategorized.length > 0) {
+    let visible = uncategorized;
+    if (!showCompleted) visible = visible.filter(t => t.status !== 'completed');
+    if (!showAll) visible = visible.filter(t => t.status !== 'completed');
+    const uDone = uncategorized.filter(t => t.status === 'completed').length;
+    html += `
+      <div class="wf-node ${uDone === uncategorized.length ? 'complete' : (uDone > 0 ? 'partial' : '')}">
+        <div class="wf-dot">📂</div>
+        <div class="wf-body">
+          <div class="wf-stage-head"><span style="color:var(--text-dim);">Uncategorized</span><span class="wf-stage-count">${uDone}/${uncategorized.length}</span></div>`;
+    if (showAll) {
+      if (visible.length > 0) {
+        html += `<div class="wf-tasks">`;
+        visible.forEach(t => {
+          const done = t.status === 'completed';
+          html += `<div class="wf-task ${done ? 'done' : ''}"><span class="wf-task-check">${done ? '✅' : '⬜'}</span><span class="wf-task-title">${escapeHtml(t.title)}</span></div>`;
+        });
+        html += `</div>`;
+      } else {
+        html += `<div class="wf-empty-note">All hidden by current filter.</div>`;
+      }
+    }
+    html += `<div style="font-size:10px;color:var(--text-muted);margin-top:6px;">💡 Assign a category to these tasks to place them in the workflow.</div>`;
+    html += `</div></div>`;
+  }
+
+  // END node
+  const allDone = totalCount > 0 && doneCount === totalCount;
+  html += `
+    <div class="wf-node wf-endpoint">
+      <div class="wf-dot" style="${allDone ? 'background:var(--accent);border-color:var(--accent);' : ''}">END</div>
+      <div class="wf-body"><div class="wf-stage-head" style="color:${allDone ? 'var(--accent)' : 'var(--text-dim)'};">${allDone ? '🎉 Ready to submit / close' : 'Submit & close tender'}</div></div>
+    </div>`;
+
+  html += '</div>';
+  container.innerHTML = html;
+}
 
 function openTaskModal(taskId = null, prefillProjectId = null) {
   editingTaskId = taskId;
@@ -6699,6 +6915,7 @@ function renderProjectView() {
         <div class="pdetail-stat"><div class="label">Qualifications</div><div class="value" style="color:var(--accent-2);">${allQuals.length}</div><div class="sublabel">across all tasks</div></div>
       </div>
       <div class="pdetail-actions">
+        <button class="btn btn-primary btn-small" onclick="openProjectWorkflow('${p.id}')">🗺 Project Workflow</button>
         <button class="btn btn-secondary btn-small" onclick="openProjectModal('${p.id}')">✎ Edit Project</button>
         <button class="btn btn-secondary btn-small" onclick="openProjectQualsModal('${p.id}')">📋 All Qualifications (${allQuals.length})</button>
         <button class="btn btn-danger btn-small" onclick="deleteProjectAndReturn('${p.id}')">Delete</button>
