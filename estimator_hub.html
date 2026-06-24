@@ -209,6 +209,13 @@ textarea { resize: vertical; min-height: 60px; }
 }
 .stage-badge.loaded { display: inline-block; }
 
+/* Task category tag */
+.task-cat-tag {
+  border: 1px solid;
+  border-radius: 5px;
+  font-weight: 600;
+}
+
 /* ====================================================================
    PREMIUM SAAS POLISH (Linear / Arc / Notion / Fluent inspired)
    Purely additive refinements — no layout or logic changes.
@@ -2479,6 +2486,14 @@ table.ctask-table th {
         <select id="taskProjectFilter" style="width:auto;">
           <option value="all">All projects</option>
         </select>
+        <select id="taskCategoryFilter" style="width:auto;" onchange="renderTasks()">
+          <option value="all">All categories</option>
+          <option value="tender_docs">📑 Tender Documents Review</option>
+          <option value="client">🤝 Client Management</option>
+          <option value="subcontract">🏗 Sub Contract Management</option>
+          <option value="takeoff">📐 Quantity Take off</option>
+          <option value="pricing">💲 Pricing</option>
+        </select>
         <button class="btn btn-primary" onclick="showGeneralTasksList()" title="Tasks not assigned to any project" id="generalListBtn">🗒 General Tasks <span id="generalListCount" style="margin-left:4px;font-size:11px;opacity:0.85;"></span></button>
         <button class="btn btn-primary" onclick="showTemplateTasksList()" title="Reusable task library — add to any project on demand" id="templateListBtn">📋 Template Tasks <span id="templateListCount" style="margin-left:4px;font-size:11px;opacity:0.85;"></span></button>
         <button class="btn btn-primary" onclick="showDefaultTasksList()" title="View and manage default tasks (templates for new projects)" id="defaultsListBtn">⭐ Default Tasks <span id="defaultsListCount" style="margin-left:4px;font-size:11px;opacity:0.85;"></span></button>
@@ -2946,6 +2961,17 @@ table.ctask-table th {
       </select>
     </div>
     <div id="baseRateHint" style="display:none;background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.25);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--text-dim);margin-bottom:14px;"></div>
+    <div class="form-group">
+      <label>Category</label>
+      <select id="taskInputCategory">
+        <option value="">-- No category --</option>
+        <option value="tender_docs">📑 Tender Documents Review</option>
+        <option value="client">🤝 Client Management</option>
+        <option value="subcontract">🏗 Sub Contract Management</option>
+        <option value="takeoff">📐 Quantity Take off</option>
+        <option value="pricing">💲 Pricing</option>
+      </select>
+    </div>
     <div class="grid grid-2">
       <div class="form-group">
         <label>Priority</label>
@@ -3477,6 +3503,7 @@ function loadState() {
     if (Array.isArray(parsed.tasks)) {
       parsed.tasks.forEach(t => {
         if (!t.taskType) t.taskType = 'regular';
+        if (t.category === undefined) t.category = null;
         if (t.startDate === undefined) t.startDate = null;
         if (t.endDate === undefined) t.endDate = null;
         if (!Array.isArray(t.tables)) t.tables = [];
@@ -4388,6 +4415,14 @@ function validateComplexDates() {
   }
 }
 
+const TASK_CATEGORY_META = {
+  tender_docs:  { label: 'Tender Documents Review', icon: '📑', color: '#3b82f6' },
+  client:       { label: 'Client Management',       icon: '🤝', color: '#a855f7' },
+  subcontract:  { label: 'Sub Contract Management', icon: '🏗', color: '#f59e0b' },
+  takeoff:      { label: 'Quantity Take off',       icon: '📐', color: '#10b981' },
+  pricing:      { label: 'Pricing',                 icon: '💲', color: '#ec4899' }
+};
+
 function openTaskModal(taskId = null, prefillProjectId = null) {
   editingTaskId = taskId;
   const modal = document.getElementById('taskModal');
@@ -4409,6 +4444,7 @@ function openTaskModal(taskId = null, prefillProjectId = null) {
     document.getElementById('taskInputProject').value = t.projectId || '';
     document.getElementById('taskInputPriority').value = t.priority;
     document.getElementById('taskInputPomo').value = t.estimatedPomodoros || 1;
+    document.getElementById('taskInputCategory').value = t.category || '';
     document.getElementById('taskInputDue').value = t.dueDate || t.scheduledDate || '';
     document.getElementById('taskInputNotes').value = t.notes || '';
     document.getElementById('taskInputSubtasks').value = (t.subtasks || []).map(s => s.title).join('\n');
@@ -4423,6 +4459,7 @@ function openTaskModal(taskId = null, prefillProjectId = null) {
     document.getElementById('taskInputProject').value = prefillProjectId || '';
     document.getElementById('taskInputPriority').value = 'medium';
     document.getElementById('taskInputPomo').value = 1;
+    document.getElementById('taskInputCategory').value = '';
     document.getElementById('taskInputDue').value = '';
     document.getElementById('taskInputNotes').value = '';
     document.getElementById('taskInputSubtasks').value = '';
@@ -4540,6 +4577,7 @@ function saveTask() {
     t.projectId = projectId;
     t.priority = document.getElementById('taskInputPriority').value;
     t.estimatedPomodoros = parseInt(document.getElementById('taskInputPomo').value) || 1;
+    t.category = document.getElementById('taskInputCategory').value || null;
     t.scheduledDate = scheduled;
     t.dueDate = dueDate;
     t.notes = document.getElementById('taskInputNotes').value;
@@ -4558,6 +4596,7 @@ function saveTask() {
       projectId,
       priority: document.getElementById('taskInputPriority').value,
       estimatedPomodoros: parseInt(document.getElementById('taskInputPomo').value) || 1,
+      category: document.getElementById('taskInputCategory').value || null,
       completedPomodoros: 0,
       scheduledDate: scheduled,
       dueDate,
@@ -5722,6 +5761,7 @@ function renderTaskItem(task, options = {}) {
           <div class="task-meta">
             <span class="pill pill-${task.priority}">${task.priority}</span>
             ${proj ? `<span class="project-tag"><span class="project-dot" style="background:${proj.color}"></span>${escapeHtml(proj.name)}</span>` : ''}
+            ${task.category && TASK_CATEGORY_META[task.category] ? `<span class="tag task-cat-tag" style="color:${TASK_CATEGORY_META[task.category].color};border-color:${TASK_CATEGORY_META[task.category].color}40;">${TASK_CATEGORY_META[task.category].icon} ${TASK_CATEGORY_META[task.category].label}</span>` : ''}
             ${task.scheduledDate ? `<span class="tag">📅 ${fmtDate(task.scheduledDate)}</span>` : ''}
             ${task.estimatedPomodoros ? `<span class="tag">🍅 ${task.completedPomodoros || 0}/${task.estimatedPomodoros}</span>` : ''}
             ${subTotal > 0 ? `<span class="tag">☑ ${subDone}/${subTotal}</span>` : ''}
@@ -6188,6 +6228,8 @@ function draw7DayChart() {
 function renderTasks() {
   const filter = document.getElementById('taskFilter').value;
   const projFilter = document.getElementById('taskProjectFilter').value;
+  const catFilterEl = document.getElementById('taskCategoryFilter');
+  const catFilter = catFilterEl ? catFilterEl.value : 'all';
   const t = today();
 
   // Populate project filter (active projects only, plus "All projects")
@@ -6220,6 +6262,10 @@ function renderTasks() {
   } else {
     // Hide tasks from on-hold / closed projects unless the user picks that project explicitly
     tasks = tasks.filter(x => !isProjectTasksHidden(x.projectId));
+  }
+  // Category filter
+  if (catFilter && catFilter !== 'all') {
+    tasks = tasks.filter(x => x.category === catFilter);
   }
 
   // Apply consistent display sort (rank → manual → priority, completed last)
