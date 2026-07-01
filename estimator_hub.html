@@ -6,6 +6,7 @@
 <title>Estimator Hub — Tender Productivity OS</title>
 <link rel="icon" type="image/svg+xml" href="assets/logos/favicon.svg">
 <link rel="apple-touch-icon" href="assets/logos/favicon.svg">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // Apply saved theme immediately to prevent flash of unstyled content
 (function() {
@@ -16,7 +17,6 @@
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root {
   /* LIGHT THEME (default) */
@@ -215,6 +215,90 @@ textarea { resize: vertical; min-height: 60px; }
   border-radius: 5px;
   font-weight: 600;
 }
+
+/* ====================================================================
+   AUTH GATE + USER PROFILE
+   ==================================================================== */
+#authGate {
+  position: fixed; inset: 0; z-index: 10000;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg); padding: 20px;
+}
+#authGate.open { display: flex; }
+/* When logged out, hide app chrome behind the gate */
+body:has(#authGate.open) .mobile-topbar,
+body:has(#authGate.open) .mobile-bottomnav { display: none !important; }
+.auth-card {
+  width: 100%; max-width: 380px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 28px 26px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+}
+[data-theme="dark"] .auth-card { box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+.auth-brand { text-align: center; margin-bottom: 22px; }
+.auth-logo { width: 46px; height: 46px; border-radius: 11px; margin-bottom: 10px; display: none; }
+.auth-logo.loaded { display: inline-block; }
+.auth-brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+.auth-brand h1 span { color: var(--accent); }
+.auth-brand p { font-size: 11px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 1px; }
+.auth-tabs { display: flex; gap: 6px; background: var(--bg-input-soft); padding: 4px; border-radius: 10px; margin-bottom: 18px; }
+.auth-tab {
+  flex: 1; padding: 8px; border: none; background: transparent;
+  color: var(--text-dim); font-weight: 600; font-size: 13px;
+  border-radius: 7px; cursor: pointer; transition: all 0.15s;
+}
+.auth-tab.active { background: var(--bg-card); color: var(--text); box-shadow: var(--shadow); }
+.auth-field { margin-bottom: 14px; }
+.auth-field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; font-weight: 500; }
+.auth-field input {
+  width: 100%; padding: 10px 12px; font-size: 14px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text);
+}
+.auth-field input:focus { outline: none; border-color: var(--accent); }
+.auth-submit { width: 100%; padding: 11px; font-size: 14px; margin-top: 4px; }
+.auth-alt { text-align: center; margin-top: 12px; font-size: 12px; }
+.auth-alt a { color: var(--accent); text-decoration: none; }
+.auth-message { margin-top: 14px; font-size: 12.5px; text-align: center; padding: 0 4px; line-height: 1.5; }
+.auth-message.error { color: var(--danger); }
+.auth-message.success { color: var(--accent); }
+.auth-message.info { color: var(--text-dim); }
+.auth-warn {
+  background: rgba(251,191,36,0.12); border: 1px solid var(--accent-warm);
+  border-radius: 8px; padding: 10px 12px; font-size: 11.5px; line-height: 1.5;
+  margin-bottom: 16px; color: var(--text-dim);
+}
+.auth-warn code { background: var(--bg-input); padding: 1px 4px; border-radius: 3px; }
+.auth-footer { margin-top: 18px; font-size: 11px; color: var(--text-muted); }
+
+/* Profile chip in sidebar */
+.profile-chip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; margin-bottom: 10px;
+  background: var(--bg-input-soft); border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer; transition: all 0.15s;
+}
+.profile-chip:hover { border-color: var(--accent); }
+.profile-chip-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; overflow: hidden;
+}
+.profile-chip-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-chip-info { min-width: 0; flex: 1; }
+.profile-chip-name { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-chip-email { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Profile modal avatar */
+.profile-avatar-wrap { text-align: center; margin-bottom: 18px; }
+.profile-avatar-big {
+  width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 10px;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px; overflow: hidden;
+}
+.profile-avatar-big img { width: 100%; height: 100%; object-fit: cover; }
 
 /* ====================================================================
    PROJECT WORKFLOW TIMELINE (START → categories → END)
@@ -452,40 +536,99 @@ textarea { resize: vertical; min-height: 60px; }
   .grid-3 { grid-template-columns: repeat(2, 1fr); }
   .grid-dash { grid-template-columns: 1fr; }
 }
-@media (max-width: 700px) {
-  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+/* ====================================================================
+   MOBILE CHROME — top bar, slide-out drawer, bottom tab nav
+   Hidden on desktop; activated under 760px.
+   ==================================================================== */
+.mobile-topbar { display: none; }
+.mobile-bottomnav { display: none; }
+.mobile-drawer-backdrop { display: none; }
+
+@media (max-width: 760px) {
   body { flex-direction: column; }
+
+  /* Top app bar */
+  .mobile-topbar {
+    display: flex; align-items: center; gap: 12px;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 900;
+    height: 56px; padding: 0 14px;
+    background: var(--bg-card); border-bottom: 1px solid var(--border);
+  }
+  .mobile-menu-btn {
+    background: none; border: none; font-size: 22px; color: var(--text);
+    cursor: pointer; padding: 4px 6px; line-height: 1;
+  }
+  .mobile-topbar-brand { display: flex; align-items: center; gap: 8px; font-size: 16px; flex: 1; }
+  .mobile-topbar-brand strong { color: var(--accent); }
+  .mobile-topbar-logo { width: 26px; height: 26px; border-radius: 6px; display: none; }
+  .mobile-topbar-logo.loaded { display: inline-block; }
+  .mobile-topbar-avatar {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; overflow: hidden; cursor: pointer;
+  }
+  .mobile-topbar-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Sidebar becomes a slide-out drawer */
   .sidebar {
-    width: 100%;
-    height: auto;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 8px;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    align-items: center;
-    gap: 4px;
-  }
-  .sidebar .brand { padding: 0 12px; border-bottom: none; margin-bottom: 0; flex-shrink: 0; }
-  .sidebar .brand p { display: none; }
-  .nav-item {
-    padding: 8px 12px;
-    border-left: none;
-    border-bottom: 3px solid transparent;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .nav-item.active { border-left-color: transparent; border-bottom-color: var(--accent); }
-  .nav-item span:not(.icon) { display: none; }
-  .sidebar-footer { display: none; }
-  .main {
-    height: auto;
-    flex: 1;
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 1000;
+    width: 270px; max-width: 82vw; height: 100vh;
+    flex-direction: column; padding: 18px 0;
+    border-right: 1px solid var(--border); border-bottom: none;
+    transform: translateX(-100%);
+    transition: transform 0.26s cubic-bezier(0.4,0,0.2,1);
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 16px;
   }
+  .sidebar.drawer-open { transform: translateX(0); box-shadow: 8px 0 30px rgba(0,0,0,0.25); }
+  .sidebar .brand { padding: 0 22px 18px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .sidebar .brand p { display: block; }
+  .nav-item { padding: 13px 22px; border-left: 3px solid transparent; border-bottom: none; white-space: normal; font-size: 15px; }
+  .nav-item span:not(.icon) { display: inline; }
+  .nav-item.active { border-left-color: var(--accent); border-bottom-color: transparent; }
+  .sidebar-footer { display: block; }
+
+  /* Backdrop behind drawer */
+  .mobile-drawer-backdrop {
+    position: fixed; inset: 0; z-index: 999;
+    background: rgba(0,0,0,0.45); opacity: 0;
+    transition: opacity 0.26s; pointer-events: none;
+  }
+  .mobile-drawer-backdrop.open { display: block; opacity: 1; pointer-events: auto; }
+
+  /* Main content: sits below top bar, above bottom nav */
+  .main {
+    height: auto; flex: 1;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 70px 14px 86px;   /* top clears app bar, bottom clears tab bar */
+  }
+
+  /* Bottom tab bar */
+  .mobile-bottomnav {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 900;
+    height: 64px; padding-bottom: env(safe-area-inset-bottom, 0);
+    background: var(--bg-card); border-top: 1px solid var(--border);
+  }
+  .mobile-bottom-item {
+    flex: 1; background: none; border: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: var(--text-muted); font-size: 10px; padding: 8px 0; transition: color 0.15s;
+  }
+  .mobile-bottom-item .mb-icon { font-size: 20px; line-height: 1; }
+  .mobile-bottom-item.active { color: var(--accent); }
+  .mobile-bottom-item:active { background: var(--bg-input-soft); }
+
+  /* Touch-friendly sizing tweaks */
+  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .view-header h2 { font-size: 20px; }
+  .btn { min-height: 40px; }
+  .modal { max-height: 88vh; }
+}
+
+/* Small phones */
+@media (max-width: 400px) {
+  .main { padding: 66px 10px 82px; }
+  .mobile-topbar-brand { font-size: 15px; }
 }
 
 /* STAT CARD */
@@ -1072,6 +1215,18 @@ table.ctask-table th {
   font-family: inherit;
 }
 .ctask-cell-input:focus { outline: 1.5px solid var(--accent); outline-offset: -1.5px; background: rgba(16,185,129,0.04); }
+/* Wrapping text cell (auto-grows) */
+.ctask-cell-wrap {
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  min-height: 30px;
+  vertical-align: top;
+}
+.ctask-cell-acct { font-variant-numeric: tabular-nums; }
 .ctask-cell-check { display: flex; align-items: center; justify-content: center; padding: 6px; }
 .ctask-cell-check input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
 .ctask-row-del {
@@ -2324,7 +2479,74 @@ table.ctask-table th {
 </head>
 <body>
 
-<div class="sidebar">
+<!-- ==================== AUTH GATE (login / signup) ==================== -->
+<div id="authGate">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <img class="auth-logo" id="authLogo" alt="">
+      <h1>Estimator <span>Hub</span></h1>
+      <p>Tender Productivity OS</p>
+    </div>
+
+    <div id="authConfigWarning" class="auth-warn" style="display:none;">
+      ⚠ Supabase isn't configured yet. Add your project URL and anon key in the code (<code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code>) to enable login.
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">Log In</button>
+      <button class="auth-tab" id="authTabSignup" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+
+    <!-- Login form -->
+    <div id="authLoginForm">
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@company.com" autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn btn-primary auth-submit" onclick="doLogin()" id="loginBtn">Log In</button>
+      <div class="auth-alt"><a href="#" onclick="doResetPassword();return false;">Forgot password?</a></div>
+    </div>
+
+    <!-- Signup form -->
+    <div id="authSignupForm" style="display:none;">
+      <div class="auth-field">
+        <label>Full Name</label>
+        <input type="text" id="signupName" placeholder="Riza" autocomplete="name">
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="signupEmail" placeholder="you@company.com" autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label>Password <span style="color:var(--text-muted);font-weight:400;">(min 6 chars)</span></label>
+        <input type="password" id="signupPassword" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()">
+      </div>
+      <button class="btn btn-primary auth-submit" onclick="doSignup()" id="signupBtn">Create Account</button>
+    </div>
+
+    <div id="authMessage" class="auth-message"></div>
+  </div>
+  <div class="auth-footer">Your data is private and synced securely to your account.</div>
+</div>
+
+<!-- ==================== MOBILE TOP BAR ==================== -->
+<div class="mobile-topbar" id="mobileTopbar">
+  <button class="mobile-menu-btn" onclick="openMobileDrawer()" aria-label="Menu">☰</button>
+  <div class="mobile-topbar-brand">
+    <img class="mobile-topbar-logo" id="mobileTopbarLogo" alt="">
+    <span>Estimator <strong>Hub</strong></span>
+  </div>
+  <div class="mobile-topbar-avatar" id="mobileTopbarAvatar" onclick="openProfileModal()">👤</div>
+</div>
+<!-- Drawer backdrop -->
+<div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop" onclick="closeMobileDrawer()"></div>
+
+<div class="sidebar" id="appSidebar">
   <div class="brand" id="brandArea">
     <img class="brand-logo" id="brandLogo" alt="Estimator Hub logo">
     <h1>Estimator <span>Hub</span></h1>
@@ -2342,10 +2564,19 @@ table.ctask-table th {
   <div class="nav-item" data-view="pomodoro"><span class="icon" data-asset="icons/pomodoro.svg">⏱</span><span>Pomodoro</span></div>
   <div class="nav-item" data-view="timebox"><span class="icon" data-asset="icons/timebox.svg">🗓</span><span>Time Box</span></div>
   <div class="nav-item" data-view="schedule"><span class="icon" data-asset="icons/schedule.svg">📆</span><span>2-Week Schedule</span></div>
+  <div class="nav-item" data-view="workflow"><span class="icon">🗺</span><span>Workflow</span></div>
   <div class="nav-item" data-view="analytics"><span class="icon" data-asset="icons/analytics.svg">📈</span><span>Analytics</span></div>
   <div class="nav-item" data-view="review"><span class="icon" data-asset="icons/review.svg">📝</span><span>Daily Review</span></div>
   <div class="nav-item" data-view="settings"><span class="icon" data-asset="icons/settings.svg">⚙</span><span>Settings</span></div>
   <div class="sidebar-footer">
+    <div class="profile-chip" id="profileChip" onclick="openProfileModal()" title="View profile">
+      <div class="profile-chip-avatar" id="profileChipAvatar">👤</div>
+      <div class="profile-chip-info">
+        <div class="profile-chip-name" id="profileChipName">Not signed in</div>
+        <div class="profile-chip-email" id="profileChipEmail"></div>
+      </div>
+      <span style="margin-left:auto;font-size:11px;color:var(--text-muted);">⚙</span>
+    </div>
     <div class="streak-badge"><img class="asset-badge stat-badge-img" data-asset="badges/streak.svg" alt="" loading="lazy"><span class="streak-emoji">🔥</span> <span id="streakDisplay">0 day streak</span></div>
     <div>Level <span id="levelDisplay">1</span> • <span id="xpDisplay">0 XP</span></div>
     <div class="sync-status" id="syncStatus" onclick="goToSyncSettings()">
@@ -2356,6 +2587,25 @@ table.ctask-table th {
       <span id="themeToggleIcon">🌙</span> <span id="themeToggleLabel">Dark mode</span>
     </button>
   </div>
+</div>
+
+<!-- ==================== MOBILE BOTTOM NAV ==================== -->
+<div class="mobile-bottomnav" id="mobileBottomNav">
+  <button class="mobile-bottom-item active" data-view="dashboard" onclick="mobileNavTo('dashboard')">
+    <span class="mb-icon">📊</span><span class="mb-label">Home</span>
+  </button>
+  <button class="mobile-bottom-item" data-view="tasks" onclick="mobileNavTo('tasks')">
+    <span class="mb-icon">✓</span><span class="mb-label">Tasks</span>
+  </button>
+  <button class="mobile-bottom-item" data-view="projects" onclick="mobileNavTo('projects')">
+    <span class="mb-icon">📁</span><span class="mb-label">Projects</span>
+  </button>
+  <button class="mobile-bottom-item" data-view="pomodoro" onclick="mobileNavTo('pomodoro')">
+    <span class="mb-icon">⏱</span><span class="mb-label">Focus</span>
+  </button>
+  <button class="mobile-bottom-item" onclick="openMobileDrawer()">
+    <span class="mb-icon">☰</span><span class="mb-label">More</span>
+  </button>
 </div>
 
 <div class="main">
@@ -2602,6 +2852,15 @@ table.ctask-table th {
         </div>
       </div>
     </div>
+
+    <!-- WORK WINDOW HISTORY (day-wise, newest first) -->
+    <div class="card" style="margin-top:18px;">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <span>📅 Work Window History</span>
+        <span style="font-size:11px;color:var(--text-muted);font-weight:400;">Tap any day to expand its focus breakdown</span>
+      </div>
+      <div id="pomoHistoryList"></div>
+    </div>
   </div>
 
   <!-- ==================== TIME BOX ==================== -->
@@ -2648,6 +2907,19 @@ table.ctask-table th {
     <div id="scheduleSummary"></div>
     <div id="scheduleGrid"></div>
     <div id="scheduleUnscheduled"></div>
+  </div>
+
+  <!-- ==================== WORKFLOW (capacity planner) ==================== -->
+  <div class="view" id="view-workflow">
+    <div class="view-header">
+      <div>
+        <h2>🗺 Workflow — Capacity Planner</h2>
+        <div class="subtitle">Pomodoro budget across active projects · planned vs actual · live with every focus block.</div>
+      </div>
+      <button class="btn btn-secondary btn-small" onclick="openWorkflowSettings()">⚙ Allocation Settings</button>
+    </div>
+    <div id="workflowSummary"></div>
+    <div id="workflowProjectList"></div>
   </div>
 
   <!-- ==================== ANALYTICS ==================== -->
@@ -2849,45 +3121,22 @@ table.ctask-table th {
         <button class="btn btn-secondary" onclick="manualRollover()">Run Rollover Now</button>
       </div>
       <div class="card">
-        <div class="card-title">☁ Google Drive Sync</div>
-        <div id="driveDisconnected">
-          <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Sync your data to Google Drive so it's available on every device. Stored as <code style="background:var(--bg-input);padding:2px 5px;border-radius:3px;font-size:11px;">estimator-hub-data.json</code> in your Drive.</p>
-          <div class="form-group">
-            <label>Google OAuth Client ID</label>
-            <input type="text" id="setGoogleClientId" placeholder="123...apps.googleusercontent.com">
-          </div>
-          <button class="btn btn-primary" onclick="connectGoogleDrive()">🔗 Connect Google Drive</button>
-          <button class="btn btn-secondary" onclick="openSetupModal()" style="margin-left:6px;">📖 How to get Client ID</button>
+        <div class="card-title">☁ Cloud Sync</div>
+        <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Your data syncs automatically to your account. Sign in on any device to access it.</p>
+        <div class="detail-row">
+          <span class="k">Status</span>
+          <span id="cloudSyncStatusText" style="color:var(--accent);">—</span>
         </div>
-        <div id="driveConnected" style="display:none;">
-          <div class="detail-row">
-            <span class="k">Status</span>
-            <span style="color:var(--accent)" id="driveStatusText">Connected</span>
-          </div>
-          <div class="detail-row">
-            <span class="k">Account</span>
-            <span id="driveAccountText">—</span>
-          </div>
-          <div class="detail-row">
-            <span class="k">Last synced</span>
-            <span id="driveLastSync">—</span>
-          </div>
-          <div class="detail-row">
-            <span class="k">Drive file</span>
-            <span id="driveFileText" style="font-size:11px;color:var(--text-dim);">—</span>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
-            <button class="btn btn-primary btn-small" onclick="syncNow()">🔄 Sync Now</button>
-            <button class="btn btn-secondary btn-small" onclick="pullFromDrive()">⬇ Pull from Drive</button>
-            <button class="btn btn-secondary btn-small" onclick="pushToDrive()">⬆ Push to Drive</button>
-            <button class="btn btn-danger btn-small" onclick="disconnectDrive()">Disconnect</button>
-          </div>
-          <div class="form-group" style="margin-top:14px;">
-            <label><input type="checkbox" id="setAutoSync" style="width:auto;display:inline;"> Auto-sync (every 60 seconds)</label>
-          </div>
+        <div class="detail-row">
+          <span class="k">Account</span>
+          <span id="cloudSyncAccount">—</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-small" onclick="pushStateToSupabase()">🔄 Sync Now</button>
+          <button class="btn btn-secondary btn-small" onclick="openProfileModal()">👤 Profile</button>
         </div>
         <hr style="margin:16px 0;border-color:var(--border);">
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Manual backup (works without Drive)</p>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Manual backup (download a copy)</p>
         <button class="btn btn-secondary btn-small" onclick="exportData()">📥 Export JSON</button>
         <label class="btn btn-secondary btn-small" style="cursor:pointer;display:inline-flex;">
           📤 Import JSON
@@ -3325,9 +3574,23 @@ table.ctask-table th {
           <option value="Mockup">Mockup</option>
         </select>
       </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tender Received Date</label>
+        <input type="date" id="projInputReceivedDate">
+      </div>
+      <div class="form-group">
+        <label>Started Working On</label>
+        <input type="date" id="projInputStartDate">
+      </div>
+    </div>
+    <div class="form-row">
       <div class="form-group">
         <label>Submission Deadline</label>
         <input type="date" id="projInputDeadline">
+      </div>
+      <div class="form-group">
+        <!-- spacer -->
       </div>
     </div>
     <div class="form-group">
@@ -3360,6 +3623,89 @@ table.ctask-table th {
   </div>
 </div>
 
+<!-- ==================== WORKFLOW ALLOCATION SETTINGS MODAL ==================== -->
+<div class="modal-overlay" id="workflowSettingsModal">
+  <div class="modal" style="max-width:460px;">
+    <h3>⚙ Allocation Settings</h3>
+    <div class="form-group">
+      <label>Pomodoros per full focus day</label>
+      <input type="number" id="wfPomosPerDay" min="1" max="30" value="12">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">12 = 5 hrs of deep work (25-min blocks)</div>
+    </div>
+    <div style="font-size:13px;font-weight:600;margin:16px 0 8px;">Planned allocation per category (%)</div>
+    <div class="form-group"><label>📑 Tender Documents Review</label><input type="number" id="wfAllocTender" min="0" max="100" value="4"></div>
+    <div class="form-group"><label>🤝 Client Management</label><input type="number" id="wfAllocClient" min="0" max="100" value="4"></div>
+    <div class="form-group"><label>🏗 Sub Contract Management</label><input type="number" id="wfAllocSub" min="0" max="100" value="25"></div>
+    <div class="form-group"><label>📐 Quantity Take off</label><input type="number" id="wfAllocTakeoff" min="0" max="100" value="27"></div>
+    <div class="form-group"><label>💲 Pricing</label><input type="number" id="wfAllocPricing" min="0" max="100" value="40"></div>
+    <div id="wfAllocTotal" style="font-size:12px;text-align:right;font-weight:600;margin-bottom:10px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeWorkflowSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveWorkflowSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TASK COMPLETION CONFIDENCE MODAL ==================== -->
+<div class="modal-overlay" id="completionModal" style="z-index:9650;">
+  <div class="modal" style="max-width:440px;">
+    <h3>✅ Task Completed</h3>
+    <div id="completionTaskName" style="font-size:13px;color:var(--text-dim);margin-bottom:18px;"></div>
+
+    <div class="form-group">
+      <label style="display:flex;justify-content:space-between;">
+        <span>How confident are you in this completion?</span>
+        <strong id="confidenceValue" style="color:var(--accent);">80%</strong>
+      </label>
+      <input type="range" id="confidenceSlider" min="0" max="100" value="80" step="5"
+             oninput="document.getElementById('confidenceValue').textContent=this.value+'%';updateConfidenceHint(this.value);"
+             style="width:100%;accent-color:var(--accent);">
+      <div id="confidenceHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;text-align:center;"></div>
+    </div>
+
+    <div style="background:var(--bg-input-soft);border-radius:8px;padding:12px 14px;margin:16px 0;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Do you need to rethink this task, or is it 100% done?</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" style="flex:1;" onclick="completeWithRethink(true)">🔄 Yes, rethink it</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="completeWithRethink(false)">✓ Done 100%</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5;">"Rethink" keeps this task completed and creates a fresh copy (highlighted) for the next day so you can revisit it.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== USER PROFILE MODAL ==================== -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal" style="max-width:440px;">
+    <h3>👤 My Profile</h3>
+    <div class="profile-avatar-wrap">
+      <div class="profile-avatar-big" id="profileAvatarBig">👤</div>
+      <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="handleAvatarUpload(event)">
+      <button class="btn btn-secondary btn-small" onclick="document.getElementById('avatarFileInput').click()" id="avatarUploadBtn">📷 Change photo</button>
+      <div id="avatarUploadStatus" style="font-size:11px;color:var(--text-muted);margin-top:4px;"></div>
+    </div>
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="profileNameInput" placeholder="Your name">
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="text" id="profileEmailInput" disabled style="opacity:0.6;">
+    </div>
+    <div class="form-group">
+      <label>Member since</label>
+      <input type="text" id="profileSinceInput" disabled style="opacity:0.6;">
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button class="btn btn-danger btn-small" onclick="doLogout()">⎋ Log Out</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="closeProfileModal()">Close</button>
+        <button class="btn btn-primary" onclick="saveProfile()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== PROJECT WORKFLOW MODAL ==================== -->
 <div class="modal-overlay" id="projectWorkflowModal">
   <div class="modal" style="max-width:760px;max-height:90vh;overflow-y:auto;">
@@ -3382,61 +3728,6 @@ table.ctask-table th {
       <span id="wfProgressLabel" style="margin-left:auto;font-weight:600;color:var(--accent);"></span>
     </div>
     <div id="workflowTimeline"></div>
-  </div>
-</div>
-
-<!-- ==================== GOOGLE DRIVE SETUP MODAL ==================== -->
-<div class="modal-overlay" id="setupModal">
-  <div class="modal" style="max-width:640px;">
-    <h3>📖 Connect Google Drive — One-time setup (~5 min)</h3>
-    <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;">Google needs to know which app is requesting access to your Drive. You'll create a free OAuth Client ID and paste it back here.</p>
-
-    <div style="background:rgba(251,191,36,0.1);border:1px solid var(--accent-warm);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;">
-      ⚠ <strong>Important:</strong> This tool must be opened via <code style="background:var(--bg-input);padding:1px 5px;border-radius:3px;">http://localhost</code> or a hosted URL — not <code style="background:var(--bg-input);padding:1px 5px;border-radius:3px;">file://</code>. Run <code style="background:var(--bg-input);padding:1px 5px;border-radius:3px;">python3 -m http.server 8000</code> in the folder, then visit <code style="background:var(--bg-input);padding:1px 5px;border-radius:3px;">http://localhost:8000</code>
-    </div>
-
-    <div class="setup-step">
-      <span class="step-num">1</span><strong>Create a Google Cloud project</strong><br>
-      Go to <a href="https://console.cloud.google.com/projectcreate" target="_blank">console.cloud.google.com/projectcreate</a> → name it anything (e.g. "Estimator Hub") → Create.
-    </div>
-
-    <div class="setup-step">
-      <span class="step-num">2</span><strong>Enable the Google Drive API</strong><br>
-      In the same project, go to <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank">APIs &amp; Services → Library → Google Drive API</a> → click <strong>Enable</strong>.
-    </div>
-
-    <div class="setup-step">
-      <span class="step-num">3</span><strong>Configure OAuth consent screen</strong><br>
-      Go to <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank">APIs &amp; Services → OAuth consent screen</a><br>
-      • User type: <strong>External</strong> → Create<br>
-      • App name: <code>Estimator Hub</code>, your email for support/developer contact<br>
-      • Scopes: skip (we'll request at runtime)<br>
-      • Test users: <strong>add your own Gmail address</strong> ← important<br>
-      • Save and continue through all steps
-    </div>
-
-    <div class="setup-step">
-      <span class="step-num">4</span><strong>Create OAuth Client ID</strong><br>
-      Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank">APIs &amp; Services → Credentials</a><br>
-      • Click <strong>+ Create Credentials → OAuth client ID</strong><br>
-      • Application type: <strong>Web application</strong><br>
-      • Name: <code>Estimator Hub Web</code><br>
-      • Under <strong>Authorized JavaScript origins</strong> add: <code>http://localhost:8000</code> (and any other URL where you'll open this — e.g. your GitHub Pages URL)<br>
-      • Click Create
-    </div>
-
-    <div class="setup-step">
-      <span class="step-num">5</span><strong>Copy your Client ID</strong><br>
-      A popup shows your Client ID (looks like <code>123456789-abc...apps.googleusercontent.com</code>). Copy it, paste into the field on the Settings page, and click <strong>Connect Google Drive</strong>.
-    </div>
-
-    <div class="setup-step" style="border-left-color:var(--accent-2);">
-      <span class="step-num" style="background:var(--accent-2)">✓</span><strong>Done.</strong> Your data will sync to a file called <code>estimator-hub-data.json</code> in your Google Drive root folder. You can move it anywhere — the app will find it by name.
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn btn-primary" onclick="closeSetupModal()">Got it</button>
-    </div>
   </div>
 </div>
 
@@ -3481,13 +3772,18 @@ const DEFAULT_STATE = {
     workEnd: '18:00',
     autoRollover: true,
     rolloverMaxDays: 7,
-    googleClientId: '',
-    driveFileId: null,
-    driveSyncEnabled: false,
-    autoSync: true,
-    lastSyncedAt: null,
     timezone: '',  // empty = auto-detect from browser
-    clockFormat: '24h'  // '24h' or '12h'
+    clockFormat: '24h',  // '24h' or '12h'
+    // ---- Workflow capacity planner ----
+    pomosPerDay: 12,  // 5 hrs of focus = 12 pomodoros
+    categoryAllocation: {  // planned % per estimation category (must total ~100)
+      tender_docs: 4,
+      client: 4,
+      subcontract: 25,
+      takeoff: 27,
+      pricing: 40
+    },
+    projectPriorityOrder: []  // array of project IDs, top = highest priority
   },
   stats: {
     totalXP: 0,
@@ -3572,6 +3868,8 @@ function loadState() {
       parsed.tasks.forEach(t => {
         if (!t.taskType) t.taskType = 'regular';
         if (t.category === undefined) t.category = null;
+        if (t.confidence === undefined) t.confidence = null;
+        if (t.isRethink === undefined) t.isRethink = false;
         if (t.startDate === undefined) t.startDate = null;
         if (t.endDate === undefined) t.endDate = null;
         if (!Array.isArray(t.tables)) t.tables = [];
@@ -3587,7 +3885,7 @@ function loadState() {
       if (!Array.isArray(parsed.calendar.sickDays)) parsed.calendar.sickDays = [];
     }
     // Merge defaults so new fields don't break old data
-    return {
+    const merged = {
       ...DEFAULT_STATE,
       ...parsed,
       settings: { ...DEFAULT_STATE.settings, ...(parsed.settings || {}) },
@@ -3595,6 +3893,10 @@ function loadState() {
       calendar: { ...DEFAULT_STATE.calendar, ...(parsed.calendar || {}) },
       pomodoroState: { ...DEFAULT_STATE.pomodoroState, ...(parsed.pomodoroState || {}) }
     };
+    // Deep-merge nested category allocation
+    merged.settings.categoryAllocation = { ...DEFAULT_STATE.settings.categoryAllocation, ...((parsed.settings || {}).categoryAllocation || {}) };
+    if (!Array.isArray(merged.settings.projectPriorityOrder)) merged.settings.projectPriorityOrder = [];
+    return merged;
   } catch (e) {
     console.error('Load failed:', e);
     return JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -3611,8 +3913,8 @@ function saveStateLocal() {
 
 function saveState() {
   saveStateLocal();
-  // Auto-push to Drive if enabled (debounced)
-  if (typeof debouncedPush === 'function') debouncedPush();
+  // Auto-push to Supabase (primary) if logged in
+  if (typeof debouncedSupaPush === 'function') debouncedSupaPush();
 }
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -3664,11 +3966,41 @@ document.querySelectorAll('.nav-item').forEach(item => {
     if (view === 'pomodoro') renderPomodoro();
     if (view === 'timebox') renderTimebox();
     if (view === 'schedule') renderSchedule();
+    if (view === 'workflow') renderWorkflow();
     if (view === 'analytics') renderAnalytics();
     if (view === 'review') renderReview();
     if (view === 'settings') loadSettingsUI();
+    // Mobile: close drawer and sync bottom nav highlight
+    closeMobileDrawer();
+    syncMobileBottomNav(view);
   });
 });
+
+/* ====================================================================
+   MOBILE NAVIGATION (drawer + bottom tab bar)
+   ==================================================================== */
+function openMobileDrawer() {
+  document.getElementById('appSidebar').classList.add('drawer-open');
+  document.getElementById('mobileDrawerBackdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeMobileDrawer() {
+  const sb2 = document.getElementById('appSidebar');
+  if (sb2) sb2.classList.remove('drawer-open');
+  const bd = document.getElementById('mobileDrawerBackdrop');
+  if (bd) bd.classList.remove('open');
+  document.body.style.overflow = '';
+}
+function mobileNavTo(view) {
+  // Reuse the existing nav-item click so behavior stays identical
+  const item = document.querySelector('.nav-item[data-view="' + view + '"]');
+  if (item) item.click();
+}
+function syncMobileBottomNav(view) {
+  document.querySelectorAll('.mobile-bottom-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === view);
+  });
+}
 
 /* ====================================================================
    AUTO-ROLLOVER
@@ -3724,6 +4056,120 @@ function isSickDay(dateStr) {
 
 function isOffDay(dateStr) {
   return isWeekend(dateStr) || isHoliday(dateStr) || isVacationDay(dateStr) || isSickDay(dateStr);
+}
+
+/* ====================================================================
+   WORKFLOW CAPACITY PLANNER
+   Pomodoro budget across active projects, capacity-aware by priority,
+   planned vs actual per category, live with each completed pomodoro.
+   ==================================================================== */
+const WF_CATEGORIES = ['tender_docs', 'client', 'subcontract', 'takeoff', 'pricing'];
+
+// Count working days (inclusive) between two date strings, excluding off-days.
+function countWorkingDaysBetween(fromStr, toStr) {
+  if (!fromStr || !toStr) return 0;
+  let count = 0;
+  const cur = new Date(fromStr + 'T00:00:00');
+  const end = new Date(toStr + 'T00:00:00');
+  if (end < cur) return 0;
+  let guard = 0;
+  while (cur <= end && guard < 2000) {
+    const ds = toLocalDateStr(cur);
+    if (!isOffDay(ds)) count++;
+    cur.setDate(cur.getDate() + 1);
+    guard++;
+  }
+  return count;
+}
+
+// List the working-day date strings from today→deadline for a project.
+function workingDaysList(fromStr, toStr) {
+  const days = [];
+  if (!fromStr || !toStr) return days;
+  const cur = new Date(fromStr + 'T00:00:00');
+  const end = new Date(toStr + 'T00:00:00');
+  let guard = 0;
+  while (cur <= end && guard < 2000) {
+    const ds = toLocalDateStr(cur);
+    if (!isOffDay(ds)) days.push(ds);
+    cur.setDate(cur.getDate() + 1);
+    guard++;
+  }
+  return days;
+}
+
+// The active projects to plan, in priority order (manual order respected,
+// any not-yet-ordered projects appended by soonest deadline).
+function getPrioritizedActiveProjects() {
+  const active = state.projects.filter(p => isProjectActive(p) && p.deadline);
+  const order = state.settings.projectPriorityOrder || [];
+  const ranked = [];
+  order.forEach(id => {
+    const p = active.find(x => x.id === id);
+    if (p) ranked.push(p);
+  });
+  // Append any active projects not in the saved order (by soonest deadline)
+  active.filter(p => !order.includes(p.id))
+    .sort((a, b) => (a.deadline || '').localeCompare(b.deadline || ''))
+    .forEach(p => ranked.push(p));
+  return ranked;
+}
+
+// Core capacity computation. For each working day, projects active that day
+// split the daily pomodoros by linear priority weight (top rank = highest).
+// Returns a map: projectId -> allocatedPomos (capacity-aware).
+function computeCapacityAllocation() {
+  const perDay = state.settings.pomosPerDay || 12;
+  const projects = getPrioritizedActiveProjects();
+  const t = today();
+
+  // Precompute each project's working-day set
+  const projDays = {};
+  projects.forEach(p => { projDays[p.id] = new Set(workingDaysList(t, p.deadline)); });
+
+  const allocated = {};
+  projects.forEach(p => { allocated[p.id] = 0; });
+
+  // Union of all working days across projects
+  const allDays = new Set();
+  projects.forEach(p => projDays[p.id].forEach(d => allDays.add(d)));
+
+  // For each day, find which projects are active, weight by priority rank
+  allDays.forEach(day => {
+    // active projects on this day, in priority order
+    const activeToday = projects.filter(p => projDays[p.id].has(day));
+    if (activeToday.length === 0) return;
+    // linear weights: highest priority gets N, next N-1, ... down to 1
+    const n = activeToday.length;
+    const weights = activeToday.map((p, i) => n - i); // i=0 is top priority
+    const weightSum = weights.reduce((a, b) => a + b, 0);
+    activeToday.forEach((p, i) => {
+      allocated[p.id] += perDay * (weights[i] / weightSum);
+    });
+  });
+
+  // Round allocations
+  Object.keys(allocated).forEach(id => { allocated[id] = Math.round(allocated[id]); });
+  return { projects, allocated, projDays };
+}
+
+// Actual pomodoros logged per category for a project (from completed sessions
+// linked to that project's tasks).
+function actualPomosByCategory(projectId) {
+  const result = { tender_docs: 0, client: 0, subcontract: 0, takeoff: 0, pricing: 0, uncategorized: 0 };
+  const projTaskIds = {};
+  state.tasks.filter(t => t.projectId === projectId).forEach(t => { projTaskIds[t.id] = t.category || 'uncategorized'; });
+  state.pomodoroSessions.filter(s => s.type === 'focus' && s.taskId && projTaskIds[s.taskId] !== undefined).forEach(s => {
+    const cat = projTaskIds[s.taskId];
+    if (result[cat] !== undefined) result[cat]++;
+    else result.uncategorized++;
+  });
+  return result;
+}
+
+function totalActualPomos(projectId) {
+  const a = actualPomosByCategory(projectId);
+  return Object.values(a).reduce((x, y) => x + y, 0);
 }
 
 function getOffDayReason(dateStr) {
@@ -3783,6 +4229,303 @@ function getWeekStartDay() {
     }
   }
   return 1;
+}
+
+/* ====================================================================
+   WORKFLOW RENDER + CONTROLS
+   ==================================================================== */
+function renderWorkflow() {
+  const summaryEl = document.getElementById('workflowSummary');
+  const listEl = document.getElementById('workflowProjectList');
+  if (!summaryEl || !listEl) return;
+
+  const { projects, allocated } = computeCapacityAllocation();
+  const perDay = state.settings.pomosPerDay || 12;
+  const alloc = state.settings.categoryAllocation;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  if (projects.length === 0) {
+    summaryEl.innerHTML = '';
+    listEl.innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">
+      <div style="font-size:40px;margin-bottom:12px;">🗺</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:6px;">No active projects with a submission deadline.</div>
+      <div style="font-size:12px;">Add a deadline to a Working/Revision/Handover project to plan its pomodoro budget.</div>
+    </div>`;
+    return;
+  }
+
+  const totalAllocated = projects.reduce((s, p) => s + (allocated[p.id] || 0), 0);
+  const totalActual = projects.reduce((s, p) => s + totalActualPomos(p.id), 0);
+
+  summaryEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+      ${[
+        ['Active Projects', projects.length, 'with deadlines', ''],
+        ['Daily Capacity', perDay, 'pomos / focus day', ''],
+        ['Total Allocated', totalAllocated, 'pomos to deadline', 'var(--accent)'],
+        ['Actual Logged', totalActual, `${totalAllocated > 0 ? Math.round(totalActual/totalAllocated*100) : 0}% of plan`, '']
+      ].map(([label, val, sub, color]) => `
+        <div class="card" style="padding:16px 20px;">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:4px;">${label}</div>
+          <div style="font-size:28px;font-weight:800;${color ? `color:${color};` : ''}">${val}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${sub}</div>
+        </div>`).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">⤵ Drag projects to reorder priority — top project gets the biggest share of each shared focus day.</div>`;
+
+  // ── Per-project proportional two-row SVG (As Planned / As of Now) ──
+  function buildProjectSVG(p, idx) {
+    const perDay      = state.settings.pomosPerDay || 12;
+    const budget      = allocated[p.id] || 0;
+    const wDays       = countWorkingDaysBetween(today(), p.deadline);
+    const rawBudget   = wDays * perDay;
+    const acBycat     = actualPomosByCategory(p.id);
+    const actualTotal = Object.values(acBycat).reduce((a, b) => a + b, 0);
+    const pctUsed     = budget > 0 ? Math.round(actualTotal / budget * 100) : 0;
+    const sharePenalty = rawBudget > budget;
+    const uncat       = acBycat.uncategorized || 0;
+    const totalBudget = Math.max(budget, 1);
+
+    const planPomos = WF_CATEGORIES.map(cat => Math.round(totalBudget * (alloc[cat] || 0) / 100));
+    const acPomos   = WF_CATEGORIES.map(cat => acBycat[cat] || 0);
+
+    let cp = 0, ca = 0;
+    const planFrac = planPomos.map(v => { cp += v; return Math.min(1, cp / totalBudget); });
+    const actFrac  = acPomos.map(v  => { ca += v; return Math.min(1, ca / totalBudget); });
+
+    const BOX_W = 148, BOX_H = 60;
+    const CARD_W = 152, CARD_H = 88;
+    const STEM = 32, DOT_R = 9;
+    const L_PAD = 18, R_PAD = 18;
+    const LINE_W = 740;
+    const LINE_SX = L_PAD + BOX_W + 16;
+    const LINE_EX = LINE_SX + LINE_W;
+    const SVG_W   = LINE_EX + 16 + BOX_W + R_PAD;
+    const ABOVE = CARD_H + STEM;
+    const BELOW = STEM + CARD_H;
+    const ROW_SEP = 44;
+    const PLAN_Y  = ABOVE + 18;
+    const ACT_Y   = PLAN_Y + BELOW + ROW_SEP + ABOVE;
+    const SVG_H   = ACT_Y + BELOW + 36;
+
+    const D = isDark;
+    const C = {
+      planLine: D ? '#10b981' : '#059669',
+      actLine:  D ? '#fbbf24' : '#d97706',
+      lineFade: D ? '#334155' : '#cbd5e1',
+      bg:       D ? '#1e293b' : '#ffffff',
+      bgSoft:   D ? '#0f172a' : '#f8fafc',
+      bdr:      D ? '#334155' : '#e2e8f0',
+      txt:      D ? '#f1f5f9' : '#1e293b',
+      sub:      D ? '#94a3b8' : '#64748b',
+      dim:      D ? '#475569' : '#94a3b8',
+      sep:      D ? '#1e293b' : '#f1f5f9',
+    };
+
+    const fx = fr => LINE_SX + Math.max(0, Math.min(1, fr)) * LINE_W;
+
+    function drawRow(lineY, fracs, vals, isActual) {
+      let s = '';
+      const RC = isActual ? C.actLine : C.planLine;
+      const rowLabel = isActual ? 'AS OF NOW' : 'AS PLANNED';
+
+      s += `<text x="${L_PAD + BOX_W/2}" y="${lineY}" dominant-baseline="middle"
+                  text-anchor="middle" font-size="8.5" font-weight="800" letter-spacing="0.6"
+                  fill="${RC}" font-family="inherit">${rowLabel}</text>`;
+
+      s += `<line x1="${LINE_SX}" y1="${lineY}" x2="${LINE_EX}" y2="${lineY}"
+                  stroke="${C.lineFade}" stroke-width="3" stroke-linecap="round"/>`;
+
+      if (isActual && actualTotal > 0) {
+        s += `<line x1="${LINE_SX}" y1="${lineY}" x2="${fx(actualTotal / totalBudget)}" y2="${lineY}"
+                    stroke="${RC}" stroke-width="3" stroke-linecap="round" opacity="0.3"/>`;
+      }
+
+      for (let t = 10; t < totalBudget; t += 10) {
+        const tx = fx(t / totalBudget);
+        s += `<line x1="${tx}" y1="${lineY-5}" x2="${tx}" y2="${lineY+5}"
+                    stroke="${C.dim}" stroke-width="0.8" opacity="0.4"/>
+              <text x="${tx}" y="${lineY + (isActual ? 16 : -9)}" text-anchor="middle"
+                    font-size="7" fill="${C.dim}" font-family="inherit" opacity="0.7">${t}</text>`;
+      }
+
+      s += `<line x1="${L_PAD+BOX_W}" y1="${lineY}" x2="${LINE_SX}" y2="${lineY}"
+                  stroke="${C.lineFade}" stroke-width="1.5" opacity="0.35"/>
+            <line x1="${LINE_EX}" y1="${lineY}" x2="${LINE_EX+16}" y2="${lineY}"
+                  stroke="${C.lineFade}" stroke-width="1.5" opacity="0.35"/>`;
+
+      const sX = L_PAD, sY = lineY - BOX_H/2;
+      s += `<rect x="${sX}" y="${sY}" width="${BOX_W}" height="${BOX_H}" rx="7"
+                  fill="${C.bgSoft}" stroke="${C.planLine}" stroke-width="1.8"/>
+            <text x="${sX+BOX_W/2}" y="${sY+15}" text-anchor="middle" font-size="10" font-weight="700" fill="${C.txt}" font-family="inherit">Tender Received</text>
+            <text x="${sX+BOX_W/2}" y="${sY+29}" text-anchor="middle" font-size="9" fill="${C.sub}" font-family="inherit">${p.receivedDate ? fmtDate(p.receivedDate) : '\u2014'}</text>
+            <text x="${sX+BOX_W/2}" y="${sY+44}" text-anchor="middle" font-size="8" fill="${C.dim}" font-family="inherit">Budget: ${totalBudget} pomos</text>`;
+
+      const eX = LINE_EX+16, eY = lineY - BOX_H/2;
+      s += `<rect x="${eX}" y="${eY}" width="${BOX_W}" height="${BOX_H}" rx="7"
+                  fill="${C.bgSoft}" stroke="${C.actLine}" stroke-width="1.8"/>
+            <text x="${eX+BOX_W/2}" y="${eY+15}" text-anchor="middle" font-size="10" font-weight="700" fill="${C.txt}" font-family="inherit">Tender Submission</text>
+            <text x="${eX+BOX_W/2}" y="${eY+29}" text-anchor="middle" font-size="9" fill="${C.sub}" font-family="inherit">${fmtDate(p.deadline)}</text>
+            <text x="${eX+BOX_W/2}" y="${eY+44}" text-anchor="middle" font-size="8" fill="${C.dim}" font-family="inherit">${wDays} days left</text>`;
+
+      WF_CATEGORIES.forEach((cat, ci) => {
+        const meta    = TASK_CATEGORY_META[cat];
+        const frac    = fracs[ci];
+        const nodeX   = fx(frac);
+        const above   = ci % 2 === 0;
+        const val     = vals[ci];
+        const planned = planPomos[ci];
+        const variance = val - planned;
+        const fillPct  = planned > 0 ? Math.min(100, Math.round(val/planned*100)) : (val>0?100:0);
+        const done     = !isActual ? (planned>0) : (val>=planned && planned>0);
+        const active   = isActual && val>0 && !done;
+        const varCol   = variance>=0 ? '#f59e0b' : '#ef4444';
+        const varTxt   = variance>0 ? `\u25b2 +${variance}` : (variance<0 ? `\u25bc ${variance}` : '\u2713');
+        const cumuP    = Math.round(frac * totalBudget);
+
+        const stemTop = above ? (lineY-DOT_R) : (lineY+DOT_R);
+        const stemEnd = above ? (lineY-DOT_R-STEM) : (lineY+DOT_R+STEM);
+        const cardY   = above ? (lineY-DOT_R-STEM-CARD_H) : (lineY+DOT_R+STEM);
+        const cardX   = nodeX - CARD_W/2;
+
+        if (active) s += `<circle cx="${nodeX}" cy="${lineY}" r="${DOT_R+7}" fill="${meta.color}" opacity="0.16"/>`;
+        s += `<line x1="${nodeX}" y1="${stemTop}" x2="${nodeX}" y2="${stemEnd}"
+                    stroke="${meta.color}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.65"/>
+              <circle cx="${nodeX}" cy="${lineY}" r="${DOT_R}"
+                      fill="${done?meta.color:C.bg}" stroke="${meta.color}" stroke-width="2.5"/>`;
+        if (done) s += `<text x="${nodeX}" y="${lineY+4}" text-anchor="middle" font-size="8" fill="#fff" font-family="inherit">\u2713</text>`;
+
+        const tickLblY = above ? (lineY+18) : (lineY-10);
+        s += `<text x="${nodeX}" y="${tickLblY}" text-anchor="middle" font-size="8" fill="${C.dim}" font-family="inherit">${cumuP}p</text>`;
+
+        const barMaxW = CARD_W-20;
+        const barFill = Math.round(barMaxW * fillPct/100);
+        const bigNum  = isActual ? val : planned;
+
+        s += `<rect x="${cardX}" y="${cardY}" width="${CARD_W}" height="${CARD_H}" rx="7"
+                    fill="${C.bg}" stroke="${meta.color}" stroke-width="1.5"/>
+              <text x="${cardX+9}" y="${cardY+14}" font-size="9.5" font-weight="700"
+                    fill="${meta.color}" font-family="inherit">${meta.icon} ${meta.label}</text>
+              <text x="${cardX+9}" y="${cardY+35}" font-size="21" font-weight="800"
+                    fill="${meta.color}" font-family="inherit">${bigNum}</text>
+              <text x="${cardX+9}" y="${cardY+49}" font-size="9" fill="${C.sub}" font-family="inherit">/ ${planned} planned</text>
+              <rect x="${cardX+9}" y="${cardY+55}" width="${barMaxW}" height="5" rx="2.5" fill="${C.bdr}"/>
+              <rect x="${cardX+9}" y="${cardY+55}" width="${barFill}" height="5" rx="2.5" fill="${meta.color}"/>`;
+        if (isActual) {
+          s += `<text x="${cardX+9}" y="${cardY+72}" font-size="9" font-weight="700" fill="${varCol}" font-family="inherit">${varTxt}</text>
+                <text x="${cardX+CARD_W-9}" y="${cardY+72}" font-size="8.5" fill="${C.dim}" font-family="inherit" text-anchor="end">${fillPct}%</text>`;
+        } else {
+          s += `<text x="${cardX+9}" y="${cardY+72}" font-size="8.5" fill="${C.dim}" font-family="inherit">${alloc[cat]||0}% \u00b7 ends at ${cumuP}p</text>`;
+        }
+      });
+      return s;
+    }
+
+    let inner = '';
+    inner += drawRow(PLAN_Y, planFrac, planPomos, false);
+    const sepY = PLAN_Y + BELOW + ROW_SEP/2;
+    inner += `<line x1="${L_PAD}" y1="${sepY}" x2="${SVG_W-R_PAD}" y2="${sepY}"
+                    stroke="${C.sep}" stroke-width="1.5" stroke-dasharray="6,4"/>`;
+    inner += drawRow(ACT_Y, actFrac, acPomos, true);
+
+    const progY  = SVG_H - 22;
+    const progW  = LINE_EX - LINE_SX;
+    const progFW = Math.min(progW, Math.round(progW * actualTotal / totalBudget));
+    const progC  = pctUsed>=100 ? '#ef4444' : (pctUsed>=75 ? '#f59e0b' : '#10b981');
+    inner += `
+      <text x="${LINE_SX}" y="${progY-6}" font-size="8" fill="${C.dim}" font-family="inherit">Total: ${actualTotal} / ${totalBudget} pomos (${pctUsed}%)</text>
+      <rect x="${LINE_SX}" y="${progY}" width="${progW}" height="7" rx="3.5" fill="${C.bdr}"/>
+      <rect x="${LINE_SX}" y="${progY}" width="${progFW}" height="7" rx="3.5" fill="${progC}"/>`;
+
+    const svgEl = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SVG_W} ${SVG_H}"
+        width="100%" style="display:block;min-width:${Math.min(SVG_W,960)}px;">${inner}</svg>`;
+
+    const uncatNote = uncat>0
+      ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">\ud83d\udcc2 ${uncat} pomo${uncat>1?'s':''} on uncategorised tasks \u2014 assign task categories so they appear in the flow.</div>`
+      : '';
+
+    return `
+      <div class="card wf-project-card" draggable="true"
+           ondragstart="wfDragStart(event,'${p.id}')"
+           ondragover="wfDragOver(event)"
+           ondrop="wfDrop(event,'${p.id}')"
+           ondragend="wfDragEnd(event)"
+           data-proj-id="${p.id}">
+        <div class="wf-proj-head">
+          <span class="wf-drag" title="Drag to reorder priority">\u22ee\u22ee</span>
+          <span class="wf-rank">#${idx+1}</span>
+          <span class="project-dot" style="background:${p.color};"></span>
+          <strong style="flex:1;font-size:15px;">${escapeHtml(p.name)}</strong>
+          <span class="wf-proj-chip">\ud83d\udcc5 ${wDays} days left${p.receivedDate ? ` \u00b7 ${countWorkingDaysBetween(p.receivedDate, p.deadline)} total` : ''}</span>
+          <span class="wf-proj-chip" style="color:var(--accent);border-color:var(--accent);">\ud83c\udf45 ${budget}${sharePenalty?` <span style="opacity:.55;">/${rawBudget}</span>`:''} pomos</span>
+          <span class="wf-proj-chip ${pctUsed>=100?'wf-chip-done':''}">\u2705 ${actualTotal} logged \u00b7 ${pctUsed}%</span>
+        </div>
+        <div style="overflow-x:auto;padding:10px 0 4px;-webkit-overflow-scrolling:touch;">
+          ${svgEl}
+        </div>
+        ${uncatNote}
+      </div>`;
+  }
+
+  listEl.innerHTML = projects.map((p, i) => buildProjectSVG(p, i)).join('');
+}
+
+// Drag-reorder for project priority
+let wfDragId = null;
+function wfDragStart(e, id) { wfDragId = id; e.dataTransfer.effectAllowed = 'move'; e.currentTarget.style.opacity = '0.5'; }
+function wfDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function wfDragEnd(e) { e.currentTarget.style.opacity = ''; wfDragId = null; }
+function wfDrop(e, targetId) {
+  e.preventDefault();
+  if (!wfDragId || wfDragId === targetId) return;
+  const projects = getPrioritizedActiveProjects();
+  let order = projects.map(p => p.id);
+  order = order.filter(id => id !== wfDragId);
+  const targetIdx = order.indexOf(targetId);
+  order.splice(targetIdx, 0, wfDragId);
+  state.settings.projectPriorityOrder = order;
+  saveState();
+  renderWorkflow();
+}
+
+/* ---- Allocation settings modal ---- */
+function openWorkflowSettings() {
+  const s = state.settings;
+  document.getElementById('wfPomosPerDay').value = s.pomosPerDay || 12;
+  document.getElementById('wfAllocTender').value = s.categoryAllocation.tender_docs;
+  document.getElementById('wfAllocClient').value = s.categoryAllocation.client;
+  document.getElementById('wfAllocSub').value = s.categoryAllocation.subcontract;
+  document.getElementById('wfAllocTakeoff').value = s.categoryAllocation.takeoff;
+  document.getElementById('wfAllocPricing').value = s.categoryAllocation.pricing;
+  updateAllocTotal();
+  document.getElementById('workflowSettingsModal').classList.add('open');
+  // live total
+  ['wfAllocTender','wfAllocClient','wfAllocSub','wfAllocTakeoff','wfAllocPricing'].forEach(id => {
+    document.getElementById(id).oninput = updateAllocTotal;
+  });
+}
+function updateAllocTotal() {
+  const total = ['wfAllocTender','wfAllocClient','wfAllocSub','wfAllocTakeoff','wfAllocPricing']
+    .reduce((s, id) => s + (parseInt(document.getElementById(id).value) || 0), 0);
+  const el = document.getElementById('wfAllocTotal');
+  el.textContent = `Total: ${total}%`;
+  el.style.color = total === 100 ? 'var(--accent)' : 'var(--accent-warm)';
+}
+function closeWorkflowSettings() { document.getElementById('workflowSettingsModal').classList.remove('open'); }
+function saveWorkflowSettings() {
+  const s = state.settings;
+  s.pomosPerDay = parseInt(document.getElementById('wfPomosPerDay').value) || 12;
+  s.categoryAllocation = {
+    tender_docs: parseInt(document.getElementById('wfAllocTender').value) || 0,
+    client: parseInt(document.getElementById('wfAllocClient').value) || 0,
+    subcontract: parseInt(document.getElementById('wfAllocSub').value) || 0,
+    takeoff: parseInt(document.getElementById('wfAllocTakeoff').value) || 0,
+    pricing: parseInt(document.getElementById('wfAllocPricing').value) || 0
+  };
+  saveState();
+  closeWorkflowSettings();
+  renderWorkflow();
+  toast('✓ Allocation settings saved');
 }
 
 /* ====================================================================
@@ -4502,14 +5245,17 @@ let currentWorkflowProjectId = null;
 function openProjectWorkflow(projectId) {
   currentWorkflowProjectId = projectId;
   const p = state.projects.find(x => x.id === projectId);
-  document.getElementById('workflowProjectName').textContent = p ? p.name : '';
-  // reset toggles to default each open
+  const nameEl = document.getElementById('workflowProjectName');
+  if (nameEl) nameEl.textContent = p ? p.name : '';
   const showAll = document.getElementById('wfShowAll');
   const showCompleted = document.getElementById('wfShowCompleted');
   if (showAll) showAll.checked = true;
   if (showCompleted) showCompleted.checked = true;
-  document.getElementById('projectWorkflowModal').classList.add('open');
   renderWorkflowTimeline();
+  const modal = document.getElementById('projectWorkflowModal');
+  modal.style.zIndex = '9700';
+  // Defer to next frame so the triggering click fully finishes first
+  requestAnimationFrame(() => modal.classList.add('open'));
 }
 
 function closeProjectWorkflow() {
@@ -4520,8 +5266,11 @@ function closeProjectWorkflow() {
 function renderWorkflowTimeline() {
   if (!currentWorkflowProjectId) return;
   const container = document.getElementById('workflowTimeline');
-  const showAll = document.getElementById('wfShowAll').checked;
-  const showCompleted = document.getElementById('wfShowCompleted').checked;
+  if (!container) return;
+  const showAllEl = document.getElementById('wfShowAll');
+  const showCompletedEl = document.getElementById('wfShowCompleted');
+  const showAll = showAllEl ? showAllEl.checked : true;
+  const showCompleted = showCompletedEl ? showCompletedEl.checked : true;
 
   // All tasks for this project
   const projTasks = state.tasks.filter(t => t.projectId === currentWorkflowProjectId);
@@ -4868,6 +5617,120 @@ function saveTask() {
   toast(editingTaskId ? '✓ Task updated' : '✓ Task created');
 }
 
+/* ====================================================================
+   TASK COMPLETION CONFIDENCE + RETHINK
+   ==================================================================== */
+let completionTaskId = null;
+
+function openCompletionModal(taskId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  completionTaskId = taskId;
+  document.getElementById('completionTaskName').textContent = t.title;
+  const slider = document.getElementById('confidenceSlider');
+  slider.value = 80;
+  document.getElementById('confidenceValue').textContent = '80%';
+  updateConfidenceHint(80);
+  document.getElementById('completionModal').classList.add('open');
+}
+
+function updateConfidenceHint(val) {
+  val = Number(val);
+  const hint = document.getElementById('confidenceHint');
+  if (!hint) return;
+  let msg = '';
+  if (val >= 90) msg = '💪 Rock solid';
+  else if (val >= 70) msg = '👍 Pretty confident';
+  else if (val >= 50) msg = '🤔 Some doubts remain';
+  else if (val >= 30) msg = '⚠ Shaky — a rethink may help';
+  else msg = '🔄 Low confidence — worth revisiting';
+  hint.textContent = msg;
+}
+
+function completeWithRethink(wantRethink) {
+  const t = state.tasks.find(x => x.id === completionTaskId);
+  document.getElementById('completionModal').classList.remove('open');
+  if (!t) { completionTaskId = null; return; }
+
+  // Record confidence on the original (now-completed) task
+  t.confidence = Number(document.getElementById('confidenceSlider').value);
+
+  if (wantRethink) {
+    createRethinkTask(t);
+    toast('🔄 Rethink task created for the next day');
+  } else {
+    toast('✓ Marked done with ' + t.confidence + '% confidence');
+  }
+  completionTaskId = null;
+  saveState();
+  renderDashboard();
+  renderTasks();
+  renderSidebarProjects();
+  if (currentProjectId && document.getElementById('view-project-detail').classList.contains('active')) renderProjectView();
+  if (document.getElementById('view-projects').classList.contains('active')) renderProjects();
+  refreshDefaultsViewIfActive();
+}
+
+// Build a fresh, unchecked copy of a task for revisiting the next day.
+function createRethinkTask(src) {
+  // Base date = the original's completion/due/scheduled date; rethink = next day
+  const baseDateStr = (src.completedAt ? toLocalDateStr(new Date(src.completedAt)) : (src.dueDate || src.scheduledDate || today()));
+  const base = new Date(baseDateStr + 'T00:00:00');
+  base.setDate(base.getDate() + 1);
+  const nextDay = toLocalDateStr(base);
+
+  // Deep-clone tables with fresh IDs
+  const tables = (src.tables || []).map(tb => {
+    const cm = {};
+    const cols = (tb.columns || []).map(c => { const n = uid(); cm[c.id] = n; return { id: n, name: c.name, type: c.type }; });
+    const rows = (tb.rows || []).map(r => {
+      const cells = {};
+      Object.keys(r.cells || {}).forEach(o => { if (cm[o]) cells[cm[o]] = r.cells[o]; });
+      return { id: uid(), cells };
+    });
+    return { id: uid(), name: tb.name, columns: cols, rows };
+  });
+
+  let startDate = null, endDate = null;
+  if (src.taskType === 'complex' && src.startDate && src.endDate) {
+    // shift the span to start the day after, preserving length
+    const span = Math.round((new Date(src.endDate) - new Date(src.startDate)) / 86400000);
+    startDate = nextDay;
+    const e = new Date(base); e.setDate(e.getDate() + span);
+    endDate = toLocalDateStr(e);
+  }
+
+  state.tasks.push({
+    id: uid(),
+    title: src.title,
+    projectId: src.projectId,
+    priority: src.priority || 'medium',
+    estimatedPomodoros: src.estimatedPomodoros || 1,
+    completedPomodoros: 0,
+    scheduledDate: nextDay,
+    dueDate: src.taskType === 'complex' ? endDate : nextDay,
+    taskType: src.taskType === 'complex' ? 'complex' : 'regular',
+    startDate,
+    endDate,
+    tables,
+    category: src.category || null,
+    notes: src.notes || '',
+    subtasks: (src.subtasks || []).map(s => ({ id: uid(), title: s.title, done: false })),
+    qualifications: [],
+    timeBoxes: [],
+    manualOrder: null,
+    rank: '',
+    status: 'pending',
+    confidence: null,
+    isRethink: true,
+    rethinkOf: src.id,
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    rolledOver: false,
+    rolloverCount: 0
+  });
+}
+
 function toggleTask(id) {
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
@@ -4906,6 +5769,8 @@ function toggleTask(id) {
   }
   if (document.getElementById('view-projects').classList.contains('active')) renderProjects();
   refreshDefaultsViewIfActive();
+  // If this action just completed the task, ask for confidence + rethink
+  if (t.status === 'completed') openCompletionModal(id);
 }
 
 function toggleSubtask(taskId, subId) {
@@ -4918,6 +5783,7 @@ function toggleSubtask(taskId, subId) {
     awardXP(state.settings.xpPerSubtask, 'Subtask done — small win!');
   }
   // Auto-complete parent when all subtasks done
+  let justCompleted = false;
   if (t.subtasks && t.subtasks.length > 0) {
     const allDone = t.subtasks.every(x => x.done);
     if (allDone && t.status !== 'completed') {
@@ -4926,6 +5792,7 @@ function toggleSubtask(taskId, subId) {
       updateStreak();
       awardXP(state.settings.xpPerTask, '🎉 Task auto-completed — all checklist items done!');
       state.stats.smallWinCount = (state.stats.smallWinCount || 0) + 1;
+      justCompleted = true;
     } else if (!allDone && t.status === 'completed') {
       // If a subtask was un-checked, un-complete the parent too
       t.status = 'pending';
@@ -4940,6 +5807,7 @@ function toggleSubtask(taskId, subId) {
     renderProjectView();
   }
   if (document.getElementById('view-projects').classList.contains('active')) renderProjects();
+  if (justCompleted) openCompletionModal(taskId);
 }
 
 function addSubtaskFromInput(taskId) {
@@ -5327,11 +6195,32 @@ function renderTaskTables(task) {
   if (tables.length === 0) {
     return `<div style="font-size:11px;color:var(--text-muted);font-style:italic;padding:6px 0;">No tables yet. Click "+ Add Table" to build a spreadsheet-style grid (checklist, text, numbers).</div>`;
   }
+  // After this HTML lands in the DOM, size any wrapping text cells.
+  setTimeout(() => { document.querySelectorAll('.ctask-cell-wrap').forEach(autoGrowCell); }, 0);
   return tables.map(tb => renderSingleTable(task.id, tb)).join('');
 }
 
-const COL_TYPE_CYCLE = ['text', 'richtext', 'number', 'check'];
-const COL_TYPE_LABEL = { text: 'Text', richtext: 'Rich', number: '#', check: '☑' };
+const COL_TYPE_CYCLE = ['text', 'richtext', 'number', 'accounting', 'check'];
+const COL_TYPE_LABEL = { text: 'Text', richtext: 'Rich', number: '#', accounting: '$', check: '☑' };
+
+// Format a numeric value as accounting style: 1,415,967.00 (2 decimals, thousands separators)
+function formatAccounting(val) {
+  if (val === '' || val === null || val === undefined) return '';
+  const raw = acctRaw(val);
+  if (raw === '' || isNaN(Number(raw))) return String(val);
+  const num = Number(raw);
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// Strip formatting (commas etc.) back to a raw number string
+function acctRaw(val) {
+  if (val === null || val === undefined) return '';
+  return String(val).replace(/,/g, '').trim();
+}
+// Auto-grow a textarea cell to fit wrapped content
+function autoGrowCell(el) {
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight) + 'px';
+}
 
 function renderSingleTable(taskId, tb) {
   const cols = tb.columns || [];
@@ -5363,6 +6252,13 @@ function renderSingleTable(taskId, tb) {
                   onclick="event.stopPropagation();"
                   onchange="setTableCell('${taskId}','${tb.id}','${r.id}','${c.id}',this.value)"></td>`;
       }
+      if (c.type === 'accounting') {
+        const display = formatAccounting(val);
+        return `<td><input type="text" class="ctask-cell-input ctask-cell-acct" value="${escapeHtml(display)}" style="text-align:right;font-variant-numeric:tabular-nums;"
+                  onclick="event.stopPropagation();"
+                  onfocus="this.value=acctRaw(this.value);this.select();"
+                  onblur="this.value=formatAccounting(this.value);setTableCell('${taskId}','${tb.id}','${r.id}','${c.id}',acctRaw(this.value))"></td>`;
+      }
       if (c.type === 'richtext') {
         return `<td>
           <div class="ctask-rich-toolbar">
@@ -5376,10 +6272,11 @@ function renderSingleTable(taskId, tb) {
                onblur="setTableCell('${taskId}','${tb.id}','${r.id}','${c.id}',this.innerHTML)">${val || ''}</div>
         </td>`;
       }
-      // default text
-      return `<td><input type="text" class="ctask-cell-input" value="${escapeHtml(String(val))}"
+      // default text — wrapping textarea that auto-grows
+      return `<td><textarea class="ctask-cell-input ctask-cell-wrap" rows="1"
                 onclick="event.stopPropagation();"
-                onchange="setTableCell('${taskId}','${tb.id}','${r.id}','${c.id}',this.value)"></td>`;
+                oninput="autoGrowCell(this);"
+                onchange="setTableCell('${taskId}','${tb.id}','${r.id}','${c.id}',this.value)">${escapeHtml(String(val))}</textarea></td>`;
     }).join('');
     tds += `<td><div class="ctask-row-del" title="Delete row" onclick="event.stopPropagation();deleteTableRow('${taskId}','${tb.id}','${r.id}')">✕</div></td>`;
     return `<tr>${tds}</tr>`;
@@ -5435,6 +6332,8 @@ function refreshTaskTablesUI(taskId) {
     return;
   }
   containers.forEach(c => { c.innerHTML = html; });
+  // Size any wrapping text cells to fit their content
+  document.querySelectorAll('.ctask-cell-wrap').forEach(autoGrowCell);
   // Also update the table-count label in the section headers (tasks AND templates)
   document.querySelectorAll(`.task-item[data-task-id="${taskId}"], .template-row[data-template-id="${taskId}"]`).forEach(item => {
     const lbl = item.querySelector('.tables-count-label');
@@ -5768,6 +6667,71 @@ table.ct th{background:var(--bg-input-soft);}
 .coldel{font-size:12px;color:var(--danger);cursor:pointer;opacity:0.5;padding:0 4px;}
 .coldel:hover{opacity:1;}
 .cellin{border:none;background:transparent;width:100%;padding:10px 12px;font-size:14px;color:var(--text);font-family:inherit;}
+.cellwrap{resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;line-height:1.4;min-height:40px;vertical-align:top;}
+.cellacct{font-variant-numeric:tabular-nums;}
+
+/* ====================================================================
+   POMODORO WORK-WINDOW HISTORY (day-wise)
+   ==================================================================== */
+.pomo-history-day {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--bg-input-soft);
+  transition: border-color 0.15s;
+}
+.pomo-history-day.open { border-color: var(--accent); }
+.pomo-history-head {
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer; margin-bottom: 10px;
+}
+.pomo-history-chevron { font-size: 11px; color: var(--text-muted); transition: transform 0.18s; }
+.pomo-history-chevron.open { transform: rotate(90deg); }
+.pomo-history-label { font-weight: 700; font-size: 14px; }
+.pomo-history-count { margin-left: auto; font-size: 12px; color: var(--accent); font-weight: 600; }
+.pomo-history-detail { margin-top: 4px; }
+
+/* ====================================================================
+   RETHINK TASK highlight
+   ==================================================================== */
+.task-item.rethink-task {
+  background: linear-gradient(135deg, rgba(245,158,11,0.10), rgba(168,85,247,0.06));
+  border-left: 3px solid #f59e0b;
+}
+[data-theme="dark"] .task-item.rethink-task {
+  background: linear-gradient(135deg, rgba(245,158,11,0.14), rgba(168,85,247,0.10));
+}
+.rethink-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: #f59e0b;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* ====================================================================
+   WORKFLOW CAPACITY PLANNER — horizontal milestone flow
+   ==================================================================== */
+.wf-project-card { margin-bottom: 18px; }
+.wf-proj-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.wf-drag { color: var(--text-muted); cursor: grab; font-size: 13px; }
+.wf-project-card:active .wf-drag { cursor: grabbing; }
+.wf-rank { font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); padding: 2px 9px; border-radius: 10px; }
+.wf-proj-chip { font-size: 11px; color: var(--text-dim); background: var(--bg-input-soft); padding: 3px 9px; border-radius: 12px; white-space: nowrap; }
+
+/* Horizontal scroll container for the flow */
+.wf-project-card { margin-bottom: 18px; }
+.wf-proj-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.wf-drag { color: var(--text-muted); cursor: grab; font-size: 13px; }
+.wf-project-card:active .wf-drag { cursor: grabbing; }
+.wf-rank { font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); padding: 2px 9px; border-radius: 10px; }
+.wf-proj-chip { font-size: 11px; color: var(--text-dim); background: var(--bg-input-soft); border: 1px solid var(--border); padding: 3px 9px; border-radius: 12px; white-space: nowrap; }
+.wf-chip-done { color: var(--accent); border-color: var(--accent); }
 .cellin:focus{outline:1.5px solid var(--accent);outline-offset:-1.5px;background:rgba(16,185,129,0.05);}
 .cellcheck{display:flex;align-items:center;justify-content:center;padding:8px;}
 .cellcheck input{width:20px;height:20px;cursor:pointer;accent-color:var(--accent);}
@@ -5804,8 +6768,11 @@ const STORAGE_KEY = ${JSON.stringify(STORAGE)};
 const TASK_ID = ${JSON.stringify(taskId)};
 const EMBEDDED_TASK = ${embeddedTask};
 const EMBEDDED_PROJ = ${embeddedProj};
-const COL_TYPES = ['text','richtext','number','check'];
-const COL_LABEL = {text:'Text',richtext:'Rich',number:'#',check:'☑'};
+const COL_TYPES = ['text','richtext','number','accounting','check'];
+const COL_LABEL = {text:'Text',richtext:'Rich',number:'#',accounting:'$',check:'☑'};
+function fmtAcct(val){if(val===''||val===null||val===undefined)return '';const raw=acctR(val);if(raw===''||isNaN(Number(raw)))return String(val);return Number(raw).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function acctR(val){if(val===null||val===undefined)return '';return String(val).replace(/,/g,'').trim();}
+function grow(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function popConfirm(msg){try{const r=window.confirm(msg);return r;}catch(e){return true;}}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -5884,6 +6851,7 @@ function render(){
     task.tables.forEach(tb=>{ h+=renderTable(tb); });
   }
   document.getElementById('fbody').innerHTML=h;
+  document.querySelectorAll('.cellwrap').forEach(grow);
 }
 
 function renderTable(tb){
@@ -5899,13 +6867,14 @@ function renderTable(tb){
       const v=(r.cells&&r.cells[c.id]!==undefined)?r.cells[c.id]:'';
       if(c.type==='check') return '<td><div class="cellcheck"><input type="checkbox" '+(v===true||v==='true'?'checked':'')+' onchange="setCell('+"'"+tb.id+"','"+r.id+"','"+c.id+"'"+',this.checked)"></div></td>';
       if(c.type==='number') return '<td><input type="number" class="cellin" style="text-align:right;" value="'+esc(v)+'" onchange="setCell('+"'"+tb.id+"','"+r.id+"','"+c.id+"'"+',this.value)"></td>';
+      if(c.type==='accounting') return '<td><input type="text" class="cellin cellacct" style="text-align:right;" value="'+esc(fmtAcct(v))+'" onfocus="this.value=acctR(this.value);this.select();" onblur="this.value=fmtAcct(this.value);setCell('+"'"+tb.id+"','"+r.id+"','"+c.id+"'"+',acctR(this.value))"></td>';
       if(c.type==='richtext') return '<td><div class="richbar">'
         +'<button class="richbtn" onmousedown="event.preventDefault()" onclick="rich(event,'+"'bold'"+')"><b>B</b></button>'
         +'<button class="richbtn" onmousedown="event.preventDefault()" onclick="rich(event,'+"'italic'"+')"><i>i</i></button>'
         +'<button class="richbtn" onmousedown="event.preventDefault()" onclick="rich(event,'+"'underline'"+')"><u>U</u></button>'
         +'<button class="richbtn" style="color:#d97706;" onmousedown="event.preventDefault()" onclick="rich(event,'+"'hilite'"+')">▆</button>'
         +'</div><div class="richcell" contenteditable="true" onblur="setCell('+"'"+tb.id+"','"+r.id+"','"+c.id+"'"+',this.innerHTML)">'+(v||'')+'</div></td>';
-      return '<td><input type="text" class="cellin" value="'+esc(v)+'" onchange="setCell('+"'"+tb.id+"','"+r.id+"','"+c.id+"'"+',this.value)"></td>';
+      return '<td><textarea class="cellin cellwrap" rows="1" oninput="grow(this)" onchange="setCell('+"'"+tb.id+"','"+r.id+"','"+c.id+"'"+',this.value)">'+esc(v)+'</textarea></td>';
     }).join('');
     tds+='<td><div class="rowdel" title="Delete row" onclick="delRow('+"'"+tb.id+"','"+r.id+"'"+')">✕</div></td>';
     return '<tr>'+tds+'</tr>';
@@ -5955,7 +6924,7 @@ function renderTaskItem(task, options = {}) {
   const pomoBtnTitle = isPomoActive && pomoRunning ? 'Pause pomodoro' : (isPomoActive ? 'Resume pomodoro for this task' : 'Start pomodoro for this task');
   const pomoBtnClass = isPomoActive ? 'task-pomo-btn active' : 'task-pomo-btn';
   return `
-    <div class="task-item priority-${task.priority} ${task.status === 'completed' ? 'completed' : ''} ${task.rolledOver && task.status !== 'completed' ? 'rolled-over' : ''} ${isPomoActive ? 'pomo-active' : ''}"
+    <div class="task-item priority-${task.priority} ${task.status === 'completed' ? 'completed' : ''} ${task.rolledOver && task.status !== 'completed' ? 'rolled-over' : ''} ${isPomoActive ? 'pomo-active' : ''} ${task.isRethink ? 'rethink-task' : ''}"
          draggable="true"
          data-task-id="${task.id}"
          oncontextmenu="openTaskContextMenu(event, '${task.id}')"
@@ -5973,7 +6942,7 @@ function renderTaskItem(task, options = {}) {
                title="Rank (1, 2, 1.1, etc.)">
         <div class="task-check ${task.status === 'completed' ? 'checked' : ''}" onclick="toggleTask('${task.id}')"></div>
         <div class="task-body" onclick="toggleTaskDetail('${task.id}')" style="cursor:pointer;" title="Click to expand / collapse">
-          <div class="task-title"><span class="task-expand-chevron ${isOpen ? 'open' : ''}">▸</span>${escapeHtml(task.title)}</div>
+          <div class="task-title"><span class="task-expand-chevron ${isOpen ? 'open' : ''}">▸</span>${task.isRethink ? '<span class="rethink-badge">🔄 To Rethink</span> ' : ''}${escapeHtml(task.title)}</div>
           <div class="task-meta">
             <span class="pill pill-${task.priority}">${task.priority}</span>
             ${proj ? `<span class="project-tag"><span class="project-dot" style="background:${proj.color}"></span>${escapeHtml(proj.name)}</span>` : ''}
@@ -5986,6 +6955,7 @@ function renderTaskItem(task, options = {}) {
             ${task.dueDate ? `<span class="tag" style="color:var(--accent-warm)">⏳ due ${fmtDate(task.dueDate)}</span>` : ''}
             ${task.taskType === 'complex' && task.startDate && task.endDate ? `<span class="tag" style="color:#a855f7;">📊 ${fmtDate(task.startDate)}→${fmtDate(task.endDate)}</span>` : ''}
             ${(task.tables || []).length > 0 ? `<span class="tag" style="color:#a855f7;">▦ ${task.tables.length} table${task.tables.length > 1 ? 's' : ''}</span>` : ''}
+            ${task.status === 'completed' && task.confidence != null ? `<span class="tag" style="color:${task.confidence >= 70 ? 'var(--accent)' : (task.confidence >= 40 ? 'var(--accent-warm)' : 'var(--danger)')};">🎯 ${task.confidence}% confident</span>` : ''}
           </div>
         </div>
         <div class="task-actions">
@@ -6553,6 +7523,8 @@ function openProjectModal(id = null) {
     document.getElementById('projInputJobType').value = p.jobType || '';
     document.getElementById('projInputStatus').value = p.status || 'working';
     document.getElementById('projInputDeadline').value = p.deadline || '';
+    document.getElementById('projInputReceivedDate').value = p.receivedDate || '';
+    document.getElementById('projInputStartDate').value = p.startWorkDate || '';
     document.getElementById('projInputColor').value = p.color;
     document.getElementById('projInputPremortem').value = p.premortem || '';
     document.getElementById('projInputWalkaway').value = p.walkawayPrice || '';
@@ -6565,6 +7537,8 @@ function openProjectModal(id = null) {
     document.getElementById('projInputJobType').value = '';
     document.getElementById('projInputStatus').value = 'working';
     document.getElementById('projInputDeadline').value = '';
+    document.getElementById('projInputReceivedDate').value = '';
+    document.getElementById('projInputStartDate').value = '';
     document.getElementById('projInputColor').value = '#10b981';
     document.getElementById('projInputPremortem').value = '';
     document.getElementById('projInputWalkaway').value = '';
@@ -6609,6 +7583,8 @@ function saveProject() {
     jobType: document.getElementById('projInputJobType').value,
     status: newStatus,
     deadline: document.getElementById('projInputDeadline').value || null,
+    receivedDate: document.getElementById('projInputReceivedDate').value || null,
+    startWorkDate: document.getElementById('projInputStartDate').value || null,
     color: document.getElementById('projInputColor').value,
     premortem: premortem || null,
     walkawayPrice: walkaway
@@ -6898,6 +7874,7 @@ function renderProjectView() {
         <div>
           <h2 class="pdetail-title">${escapeHtml(p.name)}</h2>
           <div class="pdetail-meta-line">${escapeHtml(p.client || 'No client')} • ${escapeHtml(getProjectTypeAndJob(p) || '—')}</div>
+          ${p.receivedDate ? `<div class="pdetail-meta-line" style="color:var(--text-dim);">📥 Received: ${fmtDate(p.receivedDate)}${p.startWorkDate ? ` &nbsp;·&nbsp; 🏁 Started: ${fmtDate(p.startWorkDate)}` : ''}</div>` : ''}
           ${p.deadline ? `<div class="pdetail-meta-line" style="color:var(--accent-warm);">⏳ Deadline: ${fmtDate(p.deadline)}</div>` : ''}
           ${overdue > 0 ? `<div class="pdetail-meta-line" style="color:var(--danger);">⚠ ${overdue} overdue task${overdue > 1 ? 's' : ''}</div>` : ''}
         </div>
@@ -7832,7 +8809,8 @@ function renderProjects() {
           <span>avg ${avgPomosPerTask}/task</span>
         </div>
         ${qualCount > 0 ? `<div style="font-size:11px;margin-top:6px;color:var(--accent-2);" onclick="event.stopPropagation();openProjectQualsModal('${p.id}')">📋 ${qualCount} qualification${qualCount > 1 ? 's' : ''} — view all</div>` : '<div style="font-size:11px;margin-top:6px;color:var(--text-muted);">No qualifications yet</div>'}
-        ${p.deadline ? `<div style="font-size:11px;margin-top:6px;color:var(--accent-warm);">⏳ ${fmtDate(p.deadline)}</div>` : ''}
+        ${p.receivedDate ? `<div style="font-size:11px;margin-top:6px;color:var(--text-dim);">📥 Received: ${fmtDate(p.receivedDate)}${p.startWorkDate ? `  ·  🏁 Started: ${fmtDate(p.startWorkDate)}` : ''}</div>` : ''}
+        ${p.deadline ? `<div style="font-size:11px;margin-top:4px;color:var(--accent-warm);">⏳ Deadline: ${fmtDate(p.deadline)}</div>` : ''}
         ${overdue > 0 ? `<div style="font-size:11px;margin-top:4px;color:var(--danger);">⚠ ${overdue} overdue</div>` : ''}
         ${p.premortem ? `<div style="font-size:11px;margin-top:6px;color:var(--accent-warm);" title="${escapeHtml(p.premortem)}">📝 Premortem logged</div>` : ''}
         <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
@@ -7885,7 +8863,8 @@ function openProjectQualsModal(projectId) {
     </div>
   `;
   document.getElementById('projectQualsModalContent').innerHTML = content;
-  document.getElementById('projectQualsModal').classList.add('open');
+  const qm = document.getElementById('projectQualsModal');
+  requestAnimationFrame(() => qm.classList.add('open'));
 }
 
 function closeProjectQualsModal() {
@@ -7923,6 +8902,74 @@ let pomoRunning = false;
 let pomoSessionCount = 0;
 let pomoEndTime = null;  // wall-clock timestamp when current run ends
 let currentPomoTaskId = '';  // shared between dashboard and Pomodoro page
+
+const LIVE_POMO_KEY = 'estimator_hub_live_pomo';
+
+// Save the running pomodoro so a page refresh doesn't lose it.
+function saveLivePomo() {
+  if (pomoRunning && pomoEndTime) {
+    const data = {
+      endTime: pomoEndTime,
+      phase: pomoPhase,
+      totalSeconds: pomoTotalSeconds,
+      taskId: currentPomoTaskId || '',
+      sessionCount: pomoSessionCount,
+      savedAt: Date.now()
+    };
+    try { localStorage.setItem(LIVE_POMO_KEY, JSON.stringify(data)); } catch (e) {}
+  } else {
+    try { localStorage.removeItem(LIVE_POMO_KEY); } catch (e) {}
+  }
+}
+
+// Restore a running pomodoro on page load (counts real elapsed time).
+function restoreLivePomo() {
+  let raw;
+  try { raw = localStorage.getItem(LIVE_POMO_KEY); } catch (e) { return; }
+  if (!raw) return;
+  let d;
+  try { d = JSON.parse(raw); } catch (e) { return; }
+  if (!d || !d.endTime) return;
+
+  pomoPhase = d.phase || 'focus';
+  pomoTotalSeconds = d.totalSeconds || (state.settings.focusLength * 60);
+  currentPomoTaskId = d.taskId || '';
+  pomoSessionCount = d.sessionCount || 0;
+  pomoEndTime = d.endTime;
+
+  const remaining = Math.ceil((pomoEndTime - Date.now()) / 1000);
+
+  if (remaining > 0) {
+    // Still running — resume the ticking timer from wall clock
+    pomoSeconds = remaining;
+    pomoRunning = true;
+    setPomoStartBtnText('⏸ Pause');
+    updatePomoDisplay();
+    pomoTimer = setInterval(() => {
+      const rem = Math.max(0, Math.ceil((pomoEndTime - Date.now()) / 1000));
+      pomoSeconds = rem;
+      updatePomoDisplay();
+      if (rem <= 0) {
+        clearInterval(pomoTimer);
+        pomoRunning = false;
+        pomoEndTime = null;
+        saveLivePomo();
+        completePomoPhase();
+      }
+    }, 250);
+  } else {
+    // It finished while the tab was closed — complete it now so it's recorded
+    pomoSeconds = 0;
+    pomoRunning = false;
+    pomoEndTime = null;
+    try { localStorage.removeItem(LIVE_POMO_KEY); } catch (e) {}
+    // Only auto-complete a FOCUS block (breaks shouldn't award anything)
+    if (pomoPhase === 'focus') {
+      completePomoPhase();
+      toast('🍅 Your pomodoro finished while you were away — it\'s been recorded.');
+    }
+  }
+}
 
 function syncPomoTaskFrom(source) {
   const fromId = source === 'dash' ? 'dashPomoTaskSelect' : 'pomoTaskSelect';
@@ -7971,6 +9018,7 @@ function renderPomodoro() {
   }
   populatePomoTaskSelects();
   updatePomoStats();
+  renderPomoHistory();
   if (!pomoRunning) {
     pomoSeconds = state.settings.focusLength * 60;
     pomoTotalSeconds = pomoSeconds;
@@ -8045,12 +9093,15 @@ function togglePomodoro() {
     if (pomoEndTime) {
       pomoSeconds = Math.max(0, Math.ceil((pomoEndTime - Date.now()) / 1000));
     }
+    pomoEndTime = null;
+    saveLivePomo();
     setPomoStartBtnText('▶ Resume');
     updatePomoDisplay();
   } else {
     // START / RESUME: anchor end-time to wall clock
     pomoRunning = true;
     pomoEndTime = Date.now() + pomoSeconds * 1000;
+    saveLivePomo();
     setPomoStartBtnText('⏸ Pause');
     updatePomoDisplay();
     // Use 250ms tick for smooth display; calc remaining from wall clock each tick
@@ -8064,6 +9115,7 @@ function togglePomodoro() {
         clearInterval(pomoTimer);
         pomoRunning = false;
         pomoEndTime = null;
+        saveLivePomo();
         completePomoPhase();
       }
     }, 250);
@@ -8075,6 +9127,7 @@ function resetPomodoro() {
   pomoRunning = false;
   pomoEndTime = null;
   pomoSeconds = pomoTotalSeconds;
+  saveLivePomo();
   setPomoStartBtnText('▶ Start');
   updatePomoDisplay();
 }
@@ -8083,6 +9136,7 @@ function skipPomodoro() {
   clearInterval(pomoTimer);
   pomoRunning = false;
   pomoEndTime = null;
+  saveLivePomo();
   // Skipping a FOCUS block breaks the session streak
   if (pomoPhase === 'focus') {
     state.pomodoroState.streak = 0;
@@ -8144,6 +9198,10 @@ function completePomoPhase(skipped = false) {
   // Force work hours widget re-render so focused time updates instantly
   lastWorkHoursMinute = null;
   renderWorkHoursWidget(true);
+  // Update Pomodoro history if that view is showing
+  if (document.getElementById('view-pomodoro').classList.contains('active')) renderPomoHistory();
+  // Live-update the Workflow capacity planner if it's showing
+  if (document.getElementById('view-workflow').classList.contains('active')) renderWorkflow();
   // Show explicit notification — pomodoro does NOT auto-continue
   if (!skipped && nextPhaseMsg) {
     toast(nextPhaseMsg);
@@ -9249,8 +10307,11 @@ function loadSettingsUI() {
   document.getElementById('setPenaltyTask').value = s.xpPenaltyMissingTask;
   document.getElementById('setPenaltyOverdue').value = s.xpPenaltyOverdueDaily;
   document.getElementById('setPenaltyTimebox').value = s.xpPenaltyTimeboxMiss;
-  document.getElementById('setGoogleClientId').value = s.googleClientId || '';
-  toggleDriveUI(s.driveSyncEnabled && accessToken);
+  // Cloud sync status card
+  const cs = document.getElementById('cloudSyncStatusText');
+  const ca = document.getElementById('cloudSyncAccount');
+  if (cs) cs.textContent = currentUser ? 'Connected & syncing' : 'Not signed in';
+  if (ca) ca.textContent = currentUser ? (currentUser.email || '—') : '—';
   // Render calendar UI
   renderWeekendChecks();
   renderHolidayList();
@@ -9402,18 +10463,8 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 });
 
 /* ====================================================================
-   GOOGLE DRIVE SYNC
+   SYNC STATUS HELPERS (shared by Supabase sync)
    ==================================================================== */
-const DRIVE_FILE_NAME = 'estimator-hub-data.json';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-let tokenClient = null;
-let accessToken = null;
-let tokenExpiresAt = 0;
-let userEmail = null;
-let syncInProgress = false;
-let pushDebounceTimer = null;
-let autoSyncTimer = null;
-
 function setSyncStatus(status, text) {
   const dot = document.getElementById('syncDot');
   const txt = document.getElementById('syncText');
@@ -9426,325 +10477,6 @@ function goToSyncSettings() {
   document.querySelector('.nav-item[data-view="settings"]').click();
 }
 
-function openSetupModal() { document.getElementById('setupModal').classList.add('open'); }
-function closeSetupModal() { document.getElementById('setupModal').classList.remove('open'); }
-
-function initGoogleAuth() {
-  if (!state.settings.googleClientId) return;
-  if (typeof google === 'undefined' || !google.accounts) {
-    // GIS not loaded yet — retry
-    setTimeout(initGoogleAuth, 500);
-    return;
-  }
-  try {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: state.settings.googleClientId,
-      scope: DRIVE_SCOPE,
-      callback: (resp) => {
-        if (resp.error) {
-          setSyncStatus('error', 'Auth failed');
-          toast('⚠ Auth error: ' + resp.error);
-          return;
-        }
-        accessToken = resp.access_token;
-        tokenExpiresAt = Date.now() + (resp.expires_in - 60) * 1000;
-        onSignedIn();
-      },
-    });
-    if (state.settings.driveSyncEnabled) {
-      // Request token silently if previously connected
-      requestToken(true);
-    }
-  } catch (e) {
-    console.error('Auth init failed:', e);
-    setSyncStatus('error', 'Init failed');
-  }
-}
-
-function requestToken(silent = false) {
-  if (!tokenClient) return initGoogleAuth();
-  setSyncStatus('syncing', 'Authenticating…');
-  tokenClient.requestAccessToken({ prompt: silent ? '' : 'consent' });
-}
-
-function connectGoogleDrive() {
-  const cid = document.getElementById('setGoogleClientId').value.trim();
-  if (!cid) return toast('⚠ Paste your Client ID first');
-  if (!cid.includes('.apps.googleusercontent.com')) return toast('⚠ Client ID should end in .apps.googleusercontent.com');
-  state.settings.googleClientId = cid;
-  saveState();
-  initGoogleAuth();
-  setTimeout(() => requestToken(false), 600);
-}
-
-async function onSignedIn() {
-  state.settings.driveSyncEnabled = true;
-  saveState();
-  // Get user email
-  try {
-    const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { 'Authorization': 'Bearer ' + accessToken }
-    });
-    if (r.ok) { const j = await r.json(); userEmail = j.email; }
-  } catch (e) {}
-  toggleDriveUI(true);
-  setSyncStatus('synced', 'Connected');
-  // Initial sync: find file, then merge
-  await syncNow(true);
-  // Start auto-sync
-  startAutoSync();
-}
-
-function toggleDriveUI(connected) {
-  document.getElementById('driveDisconnected').style.display = connected ? 'none' : 'block';
-  document.getElementById('driveConnected').style.display = connected ? 'block' : 'none';
-  if (connected) {
-    document.getElementById('driveAccountText').textContent = userEmail || '(signed in)';
-    document.getElementById('driveFileText').textContent = state.settings.driveFileId ? DRIVE_FILE_NAME : '(will create on first sync)';
-    document.getElementById('driveLastSync').textContent = state.settings.lastSyncedAt ? new Date(state.settings.lastSyncedAt).toLocaleString() : 'never';
-    document.getElementById('setAutoSync').checked = state.settings.autoSync;
-  }
-}
-
-async function ensureToken() {
-  if (accessToken && Date.now() < tokenExpiresAt) return true;
-  return new Promise(resolve => {
-    const originalCb = tokenClient.callback;
-    tokenClient.callback = (resp) => {
-      tokenClient.callback = originalCb;
-      if (resp.error) { resolve(false); return; }
-      accessToken = resp.access_token;
-      tokenExpiresAt = Date.now() + (resp.expires_in - 60) * 1000;
-      resolve(true);
-    };
-    tokenClient.requestAccessToken({ prompt: '' });
-  });
-}
-
-async function driveFindFile() {
-  await ensureToken();
-  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
-  const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)`, {
-    headers: { 'Authorization': 'Bearer ' + accessToken }
-  });
-  if (!r.ok) throw new Error('Find failed: ' + r.status);
-  const j = await r.json();
-  return j.files && j.files[0] ? j.files[0] : null;
-}
-
-async function driveDownload(fileId) {
-  await ensureToken();
-  const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-    headers: { 'Authorization': 'Bearer ' + accessToken }
-  });
-  if (!r.ok) throw new Error('Download failed: ' + r.status);
-  return await r.json();
-}
-
-async function driveUpload(fileId, data) {
-  await ensureToken();
-  const body = JSON.stringify(data);
-  if (fileId) {
-    // Update existing
-    const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-      method: 'PATCH',
-      headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-      body
-    });
-    if (!r.ok) throw new Error('Update failed: ' + r.status);
-    return fileId;
-  } else {
-    // Create new (multipart)
-    const boundary = '-------EH' + Date.now();
-    const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
-    const multipart =
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
-      JSON.stringify(metadata) +
-      `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n` +
-      body +
-      `\r\n--${boundary}--`;
-    const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'multipart/related; boundary=' + boundary },
-      body: multipart
-    });
-    if (!r.ok) throw new Error('Create failed: ' + r.status);
-    const j = await r.json();
-    return j.id;
-  }
-}
-
-function mergeRemoteState(remote) {
-  // Last-write-wins by lastModified on each top-level slice
-  // Strategy: if remote.lastModified > local.lastModified → take remote wholesale
-  // Otherwise keep local
-  const localTs = state.lastModified || 0;
-  const remoteTs = remote.lastModified || 0;
-  if (remoteTs > localTs) {
-    // Preserve client ID locally — never overwrite local OAuth setup
-    const preserved = {
-      googleClientId: state.settings.googleClientId,
-      driveFileId: state.settings.driveFileId
-    };
-    state = { ...remote };
-    state.settings = { ...DEFAULT_STATE.settings, ...remote.settings, ...preserved };
-    state.stats = { ...DEFAULT_STATE.stats, ...remote.stats };
-    state.pomodoroState = { ...DEFAULT_STATE.pomodoroState, ...remote.pomodoroState };
-    return 'pulled';
-  }
-  return 'kept-local';
-}
-
-async function syncNow(isInitial = false) {
-  if (syncInProgress) return;
-  if (!state.settings.driveSyncEnabled) return toast('⚠ Connect Google Drive first');
-  if (!navigator.onLine) { setSyncStatus('offline', 'Offline'); return; }
-  syncInProgress = true;
-  setSyncStatus('syncing', 'Syncing…');
-  try {
-    let fileId = state.settings.driveFileId;
-    // If no fileId stored, search for it
-    if (!fileId) {
-      const found = await driveFindFile();
-      if (found) fileId = found.id;
-    }
-    // Pull
-    if (fileId) {
-      try {
-        const remote = await driveDownload(fileId);
-        const result = mergeRemoteState(remote);
-        if (result === 'pulled') toast('⬇ Pulled latest from Drive');
-      } catch (e) {
-        // File deleted? Reset fileId
-        fileId = null;
-      }
-    }
-    // Push
-    state.lastModified = Date.now();
-    const newId = await driveUpload(fileId, state);
-    state.settings.driveFileId = newId;
-    state.settings.lastSyncedAt = Date.now();
-    saveStateLocal();
-    setSyncStatus('synced', 'Synced ' + timeAgo(state.settings.lastSyncedAt));
-    if (document.getElementById('driveLastSync')) {
-      document.getElementById('driveLastSync').textContent = new Date(state.settings.lastSyncedAt).toLocaleString();
-      document.getElementById('driveFileText').textContent = DRIVE_FILE_NAME;
-    }
-    if (!isInitial) toast('✓ Synced to Drive');
-    renderDashboard();
-  } catch (e) {
-    console.error('Sync failed:', e);
-    setSyncStatus('error', 'Sync failed');
-    toast('⚠ Sync failed: ' + e.message);
-  } finally {
-    syncInProgress = false;
-  }
-}
-
-async function pullFromDrive() {
-  if (!state.settings.driveSyncEnabled) return toast('⚠ Connect first');
-  const ok = await customConfirm('Pull from Drive will overwrite local changes that haven\'t been synced yet. Continue?', 'Pull from Drive', 'Pull from Drive', false);
-  if (!ok) return;
-  syncInProgress = true;
-  setSyncStatus('syncing', 'Pulling…');
-  try {
-    let fileId = state.settings.driveFileId;
-    if (!fileId) {
-      const found = await driveFindFile();
-      if (!found) { toast('⚠ No file on Drive yet'); setSyncStatus('synced', 'Connected'); syncInProgress = false; return; }
-      fileId = found.id;
-    }
-    const remote = await driveDownload(fileId);
-    const preserved = { googleClientId: state.settings.googleClientId, driveFileId: fileId };
-    state = { ...remote };
-    state.settings = { ...DEFAULT_STATE.settings, ...remote.settings, ...preserved };
-    saveStateLocal();
-    setSyncStatus('synced', 'Synced ' + timeAgo(Date.now()));
-    toast('✓ Pulled from Drive');
-    renderDashboard();
-    updateSidebar();
-  } catch (e) {
-    setSyncStatus('error', 'Pull failed');
-    toast('⚠ ' + e.message);
-  } finally {
-    syncInProgress = false;
-  }
-}
-
-async function pushToDrive() {
-  if (!state.settings.driveSyncEnabled) return toast('⚠ Connect first');
-  syncInProgress = true;
-  setSyncStatus('syncing', 'Pushing…');
-  try {
-    state.lastModified = Date.now();
-    const newId = await driveUpload(state.settings.driveFileId, state);
-    state.settings.driveFileId = newId;
-    state.settings.lastSyncedAt = Date.now();
-    saveStateLocal();
-    setSyncStatus('synced', 'Synced ' + timeAgo(state.settings.lastSyncedAt));
-    toast('✓ Pushed to Drive');
-  } catch (e) {
-    setSyncStatus('error', 'Push failed');
-    toast('⚠ ' + e.message);
-  } finally {
-    syncInProgress = false;
-  }
-}
-
-function disconnectDrive() {
-  customConfirm('Disconnect Google Drive? Your local data stays, and the cloud file remains in your Drive.', 'Disconnect', 'Disconnect Drive', false).then(ok => {
-    if (!ok) return;
-    if (accessToken && google && google.accounts && google.accounts.oauth2) {
-      try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch (e) {}
-    }
-    accessToken = null;
-    tokenExpiresAt = 0;
-    state.settings.driveSyncEnabled = false;
-    state.settings.driveFileId = null;
-    state.settings.lastSyncedAt = null;
-    saveStateLocal();
-    toggleDriveUI(false);
-    setSyncStatus('offline', 'Not connected');
-    stopAutoSync();
-    toast('Disconnected from Drive');
-  });
-}
-
-function startAutoSync() {
-  stopAutoSync();
-  if (!state.settings.autoSync) return;
-  autoSyncTimer = setInterval(() => {
-    if (state.settings.driveSyncEnabled && !syncInProgress) syncNow();
-  }, 60000);
-}
-
-function stopAutoSync() {
-  if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
-}
-
-function debouncedPush() {
-  if (!state.settings.driveSyncEnabled) return;
-  clearTimeout(pushDebounceTimer);
-  pushDebounceTimer = setTimeout(() => { pushToDriveQuiet(); }, 5000);
-}
-
-async function pushToDriveQuiet() {
-  if (syncInProgress || !state.settings.driveSyncEnabled) return;
-  syncInProgress = true;
-  try {
-    state.lastModified = Date.now();
-    const newId = await driveUpload(state.settings.driveFileId, state);
-    state.settings.driveFileId = newId;
-    state.settings.lastSyncedAt = Date.now();
-    saveStateLocal();
-    setSyncStatus('synced', 'Synced ' + timeAgo(state.settings.lastSyncedAt));
-  } catch (e) {
-    setSyncStatus('error', 'Auto-push failed');
-  } finally {
-    syncInProgress = false;
-  }
-}
-
 function timeAgo(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return s + 's ago';
@@ -9752,22 +10484,6 @@ function timeAgo(ts) {
   if (s < 86400) return Math.floor(s / 3600) + 'h ago';
   return Math.floor(s / 86400) + 'd ago';
 }
-
-// Listen for auto-sync toggle
-document.addEventListener('change', e => {
-  if (e.target.id === 'setAutoSync') {
-    state.settings.autoSync = e.target.checked;
-    saveStateLocal();
-    if (e.target.checked) startAutoSync(); else stopAutoSync();
-  }
-});
-
-// Update sync status label periodically
-setInterval(() => {
-  if (state.settings.driveSyncEnabled && state.settings.lastSyncedAt && !syncInProgress) {
-    setSyncStatus('synced', 'Synced ' + timeAgo(state.settings.lastSyncedAt));
-  }
-}, 15000);
 
 /* ====================================================================
    REAL-TIME CLOCK with configurable timezone
@@ -10039,6 +10755,162 @@ function renderWorkHoursWidget(force = false) {
   `;
 }
 
+// ====================================================================
+// WORK WINDOW HISTORY — day-wise focus breakdown (Pomodoro tab)
+// ====================================================================
+// Compute the full breakdown for a given date string. Returns an object
+// with the bar segments, totals, and a boolean for whether it's "today".
+function computeWorkWindowForDate(dateStr) {
+  const [startH, startM] = (state.settings.workStart || '09:00').split(':').map(Number);
+  const [endH, endM] = (state.settings.workEnd || '17:00').split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+  const totalMinutes = Math.max(1, endMinutes - startMinutes);
+
+  const focusSessions = state.pomodoroSessions.filter(p => p.date === dateStr && p.type === 'focus');
+  const focusedPomos = focusSessions.length;
+  const focusedMinutes = focusSessions.reduce((s, p) => s + (p.duration || state.settings.focusLength || 25), 0);
+
+  const segments = [];
+  focusSessions.forEach(p => {
+    if (!p.completedAt) return;
+    const end = new Date(p.completedAt);
+    const dur = p.duration || state.settings.focusLength || 25;
+    const endMin = end.getHours() * 60 + end.getMinutes();
+    const startMin = endMin - dur;
+    const segStart = Math.max(startMinutes, startMin);
+    const segEnd = Math.min(endMinutes, endMin);
+    if (segEnd <= segStart) return;
+    segments.push({
+      leftPct: ((segStart - startMinutes) / totalMinutes) * 100,
+      widthPct: ((segEnd - segStart) / totalMinutes) * 100,
+      startLabel: minutesToClockLabel(segStart),
+      endLabel: minutesToClockLabel(segEnd),
+      dur
+    });
+  });
+  segments.sort((a, b) => a.leftPct - b.leftPct);
+
+  return { startMinutes, endMinutes, totalMinutes, focusedPomos, focusedMinutes, segments };
+}
+
+// Build the COLLAPSED bar (always visible) for a history day.
+function buildHistoryBar(dateStr, data) {
+  const isToday = dateStr === today();
+  // For today, show "now" marker + elapsed; for past days, the bar is full width context
+  let elapsedPct = 100;
+  let nowMarker = '';
+  if (isToday) {
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    elapsedPct = Math.max(0, Math.min(100, ((nowMin - data.startMinutes) / data.totalMinutes) * 100));
+    nowMarker = `<div class="now-marker" style="left:${elapsedPct}%"></div>`;
+  }
+  const segmentsHtml = data.segments.map((s, i) => `
+    <div class="pomo-segment" style="left:${s.leftPct}%;width:${s.widthPct}%;"
+         title="Pomodoro ${i + 1}: ${s.startLabel} → ${s.endLabel} (${s.dur} min)"></div>
+  `).join('');
+  return `
+    <div class="work-window-bar" style="margin:0;">
+      <div class="elapsed-fill" style="width:${isToday ? elapsedPct : 0}%"></div>
+      ${segmentsHtml}
+      ${nowMarker}
+    </div>`;
+}
+
+// Build the EXPANDED detail (stats + chips) for a history day.
+function buildHistoryDetail(dateStr, data) {
+  const elapsedPctRound = 100;
+  const focusRate = data.focusedMinutes > 0 ? Math.min(100, Math.round((data.focusedMinutes / data.totalMinutes) * 100)) : 0;
+  return `
+    <div class="work-hours-times" style="margin-top:10px;">
+      <span>${state.settings.workStart || '09:00'}</span>
+      ${data.focusedPomos > 0 ? `<span style="color:var(--accent);font-weight:600;">${data.focusedPomos} focus block${data.focusedPomos > 1 ? 's' : ''} · ${formatDuration(data.focusedMinutes)}</span>` : '<span style="color:var(--text-muted);">No focus blocks</span>'}
+      <span>${state.settings.workEnd || '17:00'}</span>
+    </div>
+    <div class="work-hours-stats" style="margin-top:12px;">
+      <div class="stat-block">
+        <div class="stat-label">Total Day</div>
+        <div class="stat-value">${formatDuration(data.totalMinutes)}</div>
+        <div class="stat-sub">work window</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label" style="color:var(--accent);">🎯 Focused</div>
+        <div class="stat-value" style="color:var(--accent);">${formatDuration(data.focusedMinutes)}</div>
+        <div class="stat-sub">${data.focusedPomos} pomos done</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">📊 Focus Rate</div>
+        <div class="stat-value">${focusRate}%</div>
+        <div class="stat-sub">of work window</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">🍅 Blocks</div>
+        <div class="stat-value">${data.focusedPomos}</div>
+        <div class="stat-sub">completed</div>
+      </div>
+    </div>
+    ${data.segments.length > 0 ? `
+    <div class="pomo-timeline-legend">
+      ${data.segments.map((s) => `<span class="pomo-chip" title="${s.startLabel} → ${s.endLabel}">🍅 ${s.startLabel}–${s.endLabel}</span>`).join('')}
+    </div>` : ''}
+  `;
+}
+
+let expandedHistoryDays = new Set();
+
+function toggleHistoryDay(dateStr) {
+  if (expandedHistoryDays.has(dateStr)) expandedHistoryDays.delete(dateStr);
+  else expandedHistoryDays.add(dateStr);
+  renderPomoHistory();
+}
+
+function renderPomoHistory() {
+  const el = document.getElementById('pomoHistoryList');
+  if (!el) return;
+
+  // Gather every date that has at least one focus session, newest first
+  const dates = [...new Set(state.pomodoroSessions.filter(p => p.type === 'focus' && p.date).map(p => p.date))];
+  // Always include today even with 0 sessions
+  const t = today();
+  if (!dates.includes(t)) dates.push(t);
+  dates.sort((a, b) => b.localeCompare(a)); // newest first
+
+  if (dates.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:10px 0;">No focus sessions recorded yet. Complete a pomodoro to start your history.</div>';
+    return;
+  }
+
+  el.innerHTML = dates.map(dateStr => {
+    const data = computeWorkWindowForDate(dateStr);
+    const isToday = dateStr === t;
+    const isOpen = expandedHistoryDays.has(dateStr);
+    const label = historyDayLabel(dateStr);
+    return `
+      <div class="pomo-history-day ${isOpen ? 'open' : ''}">
+        <div class="pomo-history-head" onclick="toggleHistoryDay('${dateStr}')">
+          <span class="pomo-history-chevron ${isOpen ? 'open' : ''}">▸</span>
+          <span class="pomo-history-label">${label}</span>
+          <span class="pomo-history-count">${data.focusedPomos > 0 ? `${data.focusedPomos} 🍅 · ${formatDuration(data.focusedMinutes)}` : '—'}</span>
+        </div>
+        ${buildHistoryBar(dateStr, data)}
+        <div class="pomo-history-detail" style="${isOpen ? '' : 'display:none;'}">
+          ${buildHistoryDetail(dateStr, data)}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Friendly label: Today / Yesterday / weekday + date
+function historyDayLabel(dateStr) {
+  const t = today();
+  if (dateStr === t) return 'Today';
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  if (dateStr === toLocalDateStr(y)) return 'Yesterday';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
 // Convert minutes-from-midnight to a clock label respecting 12h/24h setting
 function minutesToClockLabel(mins) {
   let h = Math.floor(mins / 60);
@@ -10134,6 +11006,315 @@ function toggleTheme() {
   localStorage.setItem(THEME_KEY, next);
   applyTheme(next);
   if (typeof refreshAssetsForTheme === 'function') refreshAssetsForTheme();
+  // Re-render workflow SVG so colours match new theme
+  if (document.getElementById('view-workflow').classList.contains('active')) renderWorkflow();
+}
+
+/* ====================================================================
+   SUPABASE — AUTH, CLOUD SYNC (primary), USER PROFILE
+   Schema expected:
+     user_states(user_id uuid unique, state jsonb, updated_at)
+     profiles(id uuid pk, full_name text, avatar_url text, updated_at)
+     storage bucket: avatars (public read)
+   ==================================================================== */
+// ↓↓↓ PASTE YOUR SUPABASE CREDENTIALS HERE ↓↓↓
+const SUPABASE_URL = 'https://bwfkemxgaimdzxiejdof.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_xVMKrzAH4Vx-ArzkzOZ-YQ_Nuunew7S';
+// ↑↑↑ PASTE YOUR SUPABASE CREDENTIALS HERE ↑↑↑
+
+let sb = null;
+let currentUser = null;
+let currentProfile = null;
+let supaSyncTimer = null;
+let supaConfigured = false;
+
+function initSupabase() {
+  supaConfigured = SUPABASE_URL && SUPABASE_URL !== 'YOUR_SUPABASE_URL'
+    && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY'
+    && typeof supabase !== 'undefined';
+  if (supaConfigured) {
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return supaConfigured;
+}
+
+// ---- Auth gate UI ----
+function showAuthGate() {
+  document.getElementById('authGate').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  // logo in auth card
+  if (typeof pickFirstAsset === 'function') {
+    pickFirstAsset(['logos/eh-logo.svg', 'logos/favicon.svg']).then(url => {
+      if (url) { const l = document.getElementById('authLogo'); l.src = url; l.classList.add('loaded'); }
+    });
+  }
+  if (!supaConfigured) document.getElementById('authConfigWarning').style.display = 'block';
+}
+function hideAuthGate() {
+  document.getElementById('authGate').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function switchAuthTab(tab) {
+  document.getElementById('authTabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('authTabSignup').classList.toggle('active', tab === 'signup');
+  document.getElementById('authLoginForm').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('authSignupForm').style.display = tab === 'signup' ? 'block' : 'none';
+  setAuthMessage('');
+}
+function setAuthMessage(msg, type = 'info') {
+  const el = document.getElementById('authMessage');
+  el.textContent = msg;
+  el.className = 'auth-message ' + type;
+}
+
+async function doSignup() {
+  if (!supaConfigured) return setAuthMessage('Supabase not configured yet.', 'error');
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim();
+  const password = document.getElementById('signupPassword').value;
+  if (!name) return setAuthMessage('Please enter your name.', 'error');
+  if (!email) return setAuthMessage('Please enter your email.', 'error');
+  if (password.length < 6) return setAuthMessage('Password must be at least 6 characters.', 'error');
+  const btn = document.getElementById('signupBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const { data, error } = await sb.auth.signUp({
+      email, password,
+      options: { data: { full_name: name } }
+    });
+    if (error) throw error;
+    setAuthMessage('✓ Account created! Check your email to confirm, then log in.', 'success');
+    switchAuthTab('login');
+    document.getElementById('loginEmail').value = email;
+  } catch (e) {
+    setAuthMessage(e.message || 'Sign up failed.', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create Account';
+  }
+}
+
+async function doLogin() {
+  if (!supaConfigured) return setAuthMessage('Supabase not configured yet.', 'error');
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) return setAuthMessage('Enter email and password.', 'error');
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Logging in…';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    setAuthMessage('');
+    await onAuthenticated(data.user);
+  } catch (e) {
+    if ((e.message || '').toLowerCase().includes('confirm')) {
+      setAuthMessage('Please confirm your email first (check your inbox).', 'error');
+    } else {
+      setAuthMessage(e.message || 'Login failed.', 'error');
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'Log In';
+  }
+}
+
+async function doResetPassword() {
+  const email = document.getElementById('loginEmail').value.trim();
+  if (!email) return setAuthMessage('Enter your email above first.', 'error');
+  if (!supaConfigured) return setAuthMessage('Supabase not configured yet.', 'error');
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+    setAuthMessage('✓ Password reset email sent.', 'success');
+  } catch (e) { setAuthMessage(e.message, 'error'); }
+}
+
+async function doLogout() {
+  if (sb) { try { await sb.auth.signOut(); } catch (e) {} }
+  currentUser = null; currentProfile = null;
+  closeProfileModal();
+  location.reload();
+}
+
+// ---- After successful auth ----
+async function onAuthenticated(user) {
+  currentUser = user;
+  hideAuthGate();
+  setSupaStatus('syncing', 'Loading your data…');
+  await loadProfile();
+  await pullStateFromSupabase();
+  startSupaAutoSync();
+  updateProfileUI();
+}
+
+// ---- Profile ----
+async function loadProfile() {
+  if (!sb || !currentUser) return;
+  try {
+    const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (data) {
+      currentProfile = data;
+    } else {
+      // Create a profile row from signup metadata
+      const fullName = (currentUser.user_metadata && currentUser.user_metadata.full_name) || currentUser.email.split('@')[0];
+      const { data: created } = await sb.from('profiles').upsert({ id: currentUser.id, full_name: fullName }).select().single();
+      currentProfile = created || { id: currentUser.id, full_name: fullName, avatar_url: null };
+    }
+  } catch (e) {
+    currentProfile = { id: currentUser.id, full_name: currentUser.email.split('@')[0], avatar_url: null };
+  }
+}
+
+function updateProfileUI() {
+  const name = (currentProfile && currentProfile.full_name) || (currentUser && currentUser.email) || 'User';
+  const email = (currentUser && currentUser.email) || '';
+  const avatar = currentProfile && currentProfile.avatar_url;
+  document.getElementById('profileChipName').textContent = name;
+  document.getElementById('profileChipEmail').textContent = email;
+  const chipAv = document.getElementById('profileChipAvatar');
+  const bigAv = document.getElementById('profileAvatarBig');
+  const mobAv = document.getElementById('mobileTopbarAvatar');
+  if (avatar) {
+    chipAv.innerHTML = `<img src="${avatar}" alt="">`;
+    bigAv.innerHTML = `<img src="${avatar}" alt="">`;
+    if (mobAv) mobAv.innerHTML = `<img src="${avatar}" alt="">`;
+  } else {
+    const initial = name.charAt(0).toUpperCase();
+    chipAv.textContent = initial;
+    bigAv.textContent = initial;
+    if (mobAv) mobAv.textContent = initial;
+  }
+}
+
+function openProfileModal() {
+  if (!currentUser) return;
+  document.getElementById('profileNameInput').value = (currentProfile && currentProfile.full_name) || '';
+  document.getElementById('profileEmailInput').value = currentUser.email || '';
+  const since = currentUser.created_at ? new Date(currentUser.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  document.getElementById('profileSinceInput').value = since;
+  updateProfileUI();
+  document.getElementById('avatarUploadStatus').textContent = '';
+  document.getElementById('profileModal').classList.add('open');
+}
+function closeProfileModal() {
+  document.getElementById('profileModal').classList.remove('open');
+}
+
+async function saveProfile() {
+  if (!sb || !currentUser) return closeProfileModal();
+  const name = document.getElementById('profileNameInput').value.trim() || currentUser.email.split('@')[0];
+  try {
+    const { data, error } = await sb.from('profiles').upsert({
+      id: currentUser.id, full_name: name, updated_at: new Date().toISOString()
+    }).select().single();
+    if (error) throw error;
+    currentProfile = data;
+    updateProfileUI();
+    closeProfileModal();
+    toast('✓ Profile updated');
+  } catch (e) { toast('⚠ ' + e.message); }
+}
+
+async function handleAvatarUpload(event) {
+  const file = event.target.files[0];
+  if (!file || !sb || !currentUser) return;
+  if (file.size > 3 * 1024 * 1024) return toast('⚠ Image too large (max 3MB)');
+  const status = document.getElementById('avatarUploadStatus');
+  status.textContent = 'Uploading…';
+  try {
+    const ext = file.name.split('.').pop();
+    const path = `${currentUser.id}/avatar.${ext}`;
+    const { error: upErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
+    if (upErr) throw upErr;
+    const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
+    const url = pub.publicUrl + '?t=' + Date.now(); // cache-bust
+    const { data, error } = await sb.from('profiles').upsert({
+      id: currentUser.id, avatar_url: url, updated_at: new Date().toISOString()
+    }).select().single();
+    if (error) throw error;
+    currentProfile = data;
+    updateProfileUI();
+    status.textContent = '✓ Photo updated';
+  } catch (e) {
+    status.textContent = '⚠ ' + e.message;
+  }
+  event.target.value = '';
+}
+
+// ---- Supabase state sync (primary) ----
+async function pullStateFromSupabase() {
+  if (!sb || !currentUser) return;
+  try {
+    const { data, error } = await sb.from('user_states').select('state, updated_at').eq('user_id', currentUser.id).single();
+    if (data && data.state) {
+      // Merge remote over defaults so new fields aren't lost
+      state = { ...DEFAULT_STATE, ...data.state, settings: { ...DEFAULT_STATE.settings, ...(data.state.settings || {}) } };
+      // run the same migrations loadState applies
+      normalizeLoadedState();
+      saveStateLocal();
+      setSupaStatus('online', 'Synced');
+    } else {
+      // No remote yet — push local up as the first snapshot
+      await pushStateToSupabase(true);
+      setSupaStatus('online', 'Synced');
+    }
+  } catch (e) {
+    // No row yet or offline — keep local, try to push
+    await pushStateToSupabase(true);
+    setSupaStatus('online', 'Synced');
+  }
+  performRollover();
+  updateStreak();
+  settleDayIfNeeded();
+  renderDashboard();
+  updateSidebar();
+  renderSidebarProjects();
+  refreshDefaultsViewIfActive();
+}
+
+async function pushStateToSupabase(silent = false) {
+  if (!sb || !currentUser) return;
+  if (!silent) setSupaStatus('syncing', 'Syncing…');
+  try {
+    const { error } = await sb.from('user_states').upsert({
+      user_id: currentUser.id,
+      state: state,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+    if (error) throw error;
+    if (!silent) setSupaStatus('online', 'Synced');
+  } catch (e) {
+    setSupaStatus('offline', 'Sync error');
+  }
+}
+
+function debouncedSupaPush() {
+  if (!sb || !currentUser) return;
+  clearTimeout(supaSyncTimer);
+  setSupaStatus('syncing', 'Saving…');
+  supaSyncTimer = setTimeout(() => pushStateToSupabase(), 1500);
+}
+
+function startSupaAutoSync() {
+  // Periodic safety push every 60s
+  setInterval(() => { if (currentUser) pushStateToSupabase(true); }, 60000);
+}
+
+// Reuse the existing sync status pill
+function setSupaStatus(state2, text) {
+  if (typeof setSyncStatus === 'function') setSyncStatus(state2, text);
+}
+
+// Helper: apply the same normalizations loadState() does (migrations)
+function normalizeLoadedState() {
+  if (!Array.isArray(state.tasks)) state.tasks = [];
+  if (!Array.isArray(state.projects)) state.projects = [];
+  if (!Array.isArray(state.defaultTasks)) state.defaultTasks = [];
+  if (!Array.isArray(state.templateTasks)) state.templateTasks = [];
+  state.tasks.forEach(t => {
+    if (!t.taskType) t.taskType = 'regular';
+    if (t.category === undefined) t.category = null;
+    if (!Array.isArray(t.subtasks)) t.subtasks = [];
+    if (!Array.isArray(t.tables)) t.tables = [];
+  });
 }
 
 /* ====================================================================
@@ -10150,35 +11331,53 @@ updateSidebar();
 renderSidebarProjects();
 startClock();
 refreshDefaultsViewIfActive();
+// Restore a running pomodoro if the page was refreshed mid-session
+restoreLivePomo();
 
 // Request browser notification permission (for pomodoro phase alerts)
 if ('Notification' in window && Notification.permission === 'default') {
   setTimeout(() => Notification.requestPermission(), 3000);
 }
 
-// Initialize Google Drive sync if previously connected
-if (state.settings.googleClientId) {
-  setSyncStatus('offline', 'Connecting…');
-  // Wait for GIS script to load
-  const waitForGIS = setInterval(() => {
-    if (typeof google !== 'undefined' && google.accounts) {
-      clearInterval(waitForGIS);
-      initGoogleAuth();
-    }
-  }, 300);
-  setTimeout(() => clearInterval(waitForGIS), 10000); // give up after 10s
-} else {
-  setSyncStatus('offline', 'Not connected');
-}
+setSyncStatus('offline', 'Not signed in');
 
 // Save state every 30 seconds as backup
 setInterval(saveStateLocal, 30000);
 
 // Online/offline events
 window.addEventListener('online', () => {
-  if (state.settings.driveSyncEnabled) syncNow();
+  if (currentUser) pushStateToSupabase(true);
 });
 window.addEventListener('offline', () => setSyncStatus('offline', 'Offline'));
+
+/* ====================================================================
+   AUTH BOOTSTRAP — required login gate
+   ==================================================================== */
+(async function bootstrapAuth() {
+  const ok = initSupabase();
+  if (!ok) {
+    // Supabase not configured — show gate with a warning so the app stays login-required.
+    showAuthGate();
+    return;
+  }
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session && session.user) {
+      await onAuthenticated(session.user);
+    } else {
+      showAuthGate();
+    }
+  } catch (e) {
+    showAuthGate();
+  }
+  // React to auth changes (e.g. token refresh, logout in another tab)
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      showAuthGate();
+    }
+  });
+})();
 
 /* ====================================================================
    ASSET INTEGRATION ENGINE  (v2)
@@ -10224,6 +11423,9 @@ async function initBrandLogo() {
     el.classList.toggle('logo-mark', url.includes('favicon'));
     const brand = document.getElementById('brandArea');
     if (brand) brand.classList.add('has-logo');
+    // Mobile top bar logo too
+    const mob = document.getElementById('mobileTopbarLogo');
+    if (mob) { mob.src = url; mob.classList.add('loaded'); }
   }
 }
 
